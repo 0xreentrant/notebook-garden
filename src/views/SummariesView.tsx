@@ -64,24 +64,26 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useThrottledValue } from '@/hooks/useThrottledValue'
+import { useInfiniteList } from '@/hooks/useInfiniteList'
 import {
-  filterEntries,
+  buildPinnedRows,
+  VirtualizedList,
+} from '@/components/VirtualizedList'
+import {
   formatTimestamp,
   PINS_AT_TOP_KEY,
   readPinsAtTop,
-  searchEntries,
   selectClassName,
-  sortEntries,
   type NotebookFilter,
   type SearchScope,
   type SortKey,
   type ViewFilter,
 } from '@/lib/entry-list'
-import { collectAllTags, normalizeTag } from '@/lib/tags'
+import { normalizeTag } from '@/lib/tags'
 import {
   truncateNotebookTitle,
 } from '@/lib/notebook-links'
-import { sortNotebooks } from '@/lib/notebook-list'
+import { searchNotebooks, sortNotebooks } from '@/lib/notebook-list'
 import { prepareSummaryMarkdown } from '@/summary-markdown'
 import type { NotebookRow, SummaryEntryRow } from '@/types'
 
@@ -613,7 +615,6 @@ function TagAccordion({
 }
 
 export default function SummariesView() {
-  const [entries, setEntries] = useState<SummaryEntryRow[]>([])
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [notebookFilter, setNotebookFilter] = useState<NotebookFilter>('all')
@@ -635,37 +636,24 @@ export default function SummariesView() {
   const [bulkNotebookPickerId, setBulkNotebookPickerId] = useState<number | null>(null)
   const [bulkNotebookOptions, setBulkNotebookOptions] = useState<NotebookRow[]>([])
   const [bulkNotebookOptionsLoading, setBulkNotebookOptionsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [bulkNotebookFilterQuery, setBulkNotebookFilterQuery] = useState('')
+  const deferredBulkNotebookFilterQuery = useDeferredValue(bulkNotebookFilterQuery)
+  const filteredBulkNotebookOptions = useMemo(
+    () => searchNotebooks(bulkNotebookOptions, deferredBulkNotebookFilterQuery),
+    [bulkNotebookOptions, deferredBulkNotebookFilterQuery],
+  )
   const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set())
   const [, startExpandTransition] = useTransition()
 
-  const allTags = useMemo(() => collectAllTags(entries), [entries])
-
-  useEffect(() => {
-    if (tagFilter !== 'all' && !allTags.includes(tagFilter)) {
-      setTagFilter('all')
-    }
-  }, [allTags, tagFilter])
-
-  const { pinnedEntries, normalEntries } = useMemo(() => {
-    const sorted = sortEntries(
-      searchEntries(
-        filterEntries(entries, viewFilter, notebookFilter, tagFilter),
-        deferredFilterQuery,
-        searchScope,
-      ),
-      sortKey,
-    )
-    if (!pinsAtTop) {
-      return { pinnedEntries: [] as SummaryEntryRow[], normalEntries: sorted }
-    }
-    return {
-      pinnedEntries: sorted.filter((entry) => entry.pinned),
-      normalEntries: sorted.filter((entry) => !entry.pinned),
-    }
-  }, [
-    entries,
+  const listFilters = useMemo(() => ({
+    sort: sortKey,
+    view: viewFilter,
+    notebook: notebookFilter,
+    tag: tagFilter,
+    search: deferredFilterQuery,
+    searchScope,
+    pinsAtTop,
+  }), [
     sortKey,
     viewFilter,
     notebookFilter,
@@ -675,17 +663,38 @@ export default function SummariesView() {
     pinsAtTop,
   ])
 
-  const visibleCount = pinnedEntries.length + normalEntries.length
+  const {
+    items: entries,
+    tags: allTags,
+    total,
+    hasMore,
+    loading,
+    loadingMore,
+    error,
+    loadMoreError,
+    loadMore,
+    replaceItem,
+    removeItem,
+  } = useInfiniteList<SummaryEntryRow>('/api/entries', listFilters)
 
-  const visibleEntries = useMemo(
-    () => [...pinnedEntries, ...normalEntries],
-    [pinnedEntries, normalEntries],
-  )
+  useEffect(() => {
+    if (tagFilter !== 'all' && !allTags.includes(tagFilter)) {
+      setTagFilter('all')
+    }
+  }, [allTags, tagFilter])
 
   const selectedCount = selectedIds.size
 
+  const rows = useMemo(
+    () =>
+      buildPinnedRows(entries, pinsAtTop, { pinned: 'Pinned', rest: 'Entries' }, {
+        showStatus: hasMore || loadingMore || Boolean(loadMoreError),
+      }),
+    [entries, pinsAtTop, hasMore, loadingMore, loadMoreError],
+  )
+
   useEffect(() => {
-    const visibleIdSet = new Set(visibleEntries.map((entry) => entry.id))
+    const visibleIdSet = new Set(entries.map((entry) => entry.id))
     setSelectedIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIdSet.has(id)))
       return next.size === prev.size ? prev : next
@@ -694,38 +703,11 @@ export default function SummariesView() {
       const next = new Set([...prev].filter((id) => visibleIdSet.has(id)))
       return next.size === prev.size ? prev : next
     })
-  }, [visibleEntries])
+  }, [entries])
 
   useEffect(() => {
     localStorage.setItem(PINS_AT_TOP_KEY, String(pinsAtTop))
   }, [pinsAtTop])
-
-  useEffect(() => {
-    fetch('/api/entries')
-      .then(async (response) => {
-        if (!response.ok) {
-          const payload = await response.json().catch(() => ({}))
-          throw new Error(payload.error ?? `HTTP ${response.status}`)
-        }
-        return response.json() as Promise<SummaryEntryRow[]>
-      })
-      .then((rows) => {
-        setEntries(rows)
-        setError(null)
-      })
-      .catch((fetchError: Error) => {
-        setError(fetchError.message)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [])
-
-  const replaceEntry = useCallback((updated: SummaryEntryRow) => {
-    setEntries((current) =>
-      current.map((entry) => (entry.id === updated.id ? updated : entry)),
-    )
-  }, [])
 
   const deleteEntry = useCallback(async (id: number) => {
     const response = await fetch(`/api/entries/${id}`, { method: 'DELETE' })
@@ -733,8 +715,8 @@ export default function SummariesView() {
       const payload = await response.json().catch(() => ({}))
       throw new Error(payload.error ?? `HTTP ${response.status}`)
     }
-    setEntries((current) => current.filter((entry) => entry.id !== id))
-  }, [])
+    removeItem(id)
+  }, [removeItem])
 
   const toggleSelected = useCallback((id: number, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -761,9 +743,9 @@ export default function SummariesView() {
 
   const expandAll = useCallback(() => {
     startExpandTransition(() => {
-      setExpandedIds(new Set(visibleEntries.map((entry) => entry.id)))
+      setExpandedIds(new Set(entries.map((entry) => entry.id)))
     })
-  }, [visibleEntries])
+  }, [entries])
 
   const collapseAll = useCallback(() => {
     startExpandTransition(() => {
@@ -772,7 +754,7 @@ export default function SummariesView() {
   }, [])
 
   function selectedEntries() {
-    return visibleEntries.filter((entry) => selectedIds.has(entry.id))
+    return entries.filter((entry) => selectedIds.has(entry.id))
   }
 
   const handleTagsChange = useCallback(
@@ -783,9 +765,9 @@ export default function SummariesView() {
         body: JSON.stringify({ tags }),
       })
       if (!response.ok) return
-      replaceEntry((await response.json()) as SummaryEntryRow)
+      replaceItem((await response.json()) as SummaryEntryRow)
     },
-    [replaceEntry],
+    [replaceItem],
   )
 
   async function bulkSetPinned(pinned: boolean) {
@@ -797,7 +779,7 @@ export default function SummariesView() {
         body: JSON.stringify({ pinned }),
       })
       if (!response.ok) continue
-      replaceEntry((await response.json()) as SummaryEntryRow)
+      replaceItem((await response.json()) as SummaryEntryRow)
     }
   }
 
@@ -815,7 +797,7 @@ export default function SummariesView() {
           body: JSON.stringify({ tags: [...entry.tags, tag] }),
         })
         if (!response.ok) continue
-        replaceEntry((await response.json()) as SummaryEntryRow)
+        replaceItem((await response.json()) as SummaryEntryRow)
       }
       setBulkTagOpen(false)
       setBulkTagDraft('')
@@ -847,7 +829,7 @@ export default function SummariesView() {
   ) {
     for (const entry of entries) {
       const updated = await saveNotebookUrl(entry.id, notebookUrl, title)
-      replaceEntry(updated)
+      replaceItem(updated)
     }
   }
 
@@ -885,6 +867,7 @@ export default function SummariesView() {
   async function openBulkNotebookExistingModal() {
     setBulkNotebookError(null)
     setBulkNotebookPickerId(null)
+    setBulkNotebookFilterQuery('')
     setBulkNotebookExistingOpen(true)
     setBulkNotebookOptionsLoading(true)
     try {
@@ -942,9 +925,9 @@ export default function SummariesView() {
         onOpenChange={toggleExpanded}
         onSelectedChange={toggleSelected}
         onDelete={deleteEntry}
-        onNotebookCreated={replaceEntry}
-        onViewed={replaceEntry}
-        onPinned={replaceEntry}
+        onNotebookCreated={replaceItem}
+        onViewed={replaceItem}
+        onPinned={replaceItem}
         onTagsChange={handleTagsChange}
         allTags={allTags}
       />
@@ -966,11 +949,7 @@ export default function SummariesView() {
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {loading
-                ? 'Loading summaries…'
-                : visibleCount === entries.length
-                  ? `${entries.length} entries from summaries.db`
-                  : `${visibleCount} of ${entries.length} entries`}
+              {loading ? 'Loading summaries…' : `${total} entries`}
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button variant="outline" size="sm" onClick={expandAll}>
@@ -1109,34 +1088,53 @@ export default function SummariesView() {
           </div>
         ) : null}
 
-        <div className="flex flex-col gap-4">
-          {pinsAtTop && pinnedEntries.length > 0 ? (
-            <section className="flex flex-col gap-4">
-              <h2 className="text-sm font-medium text-muted-foreground">
-                Pinned
-              </h2>
-              {pinnedEntries.map(renderEntry)}
-            </section>
-          ) : null}
-          {normalEntries.length > 0 ? (
-            pinsAtTop && pinnedEntries.length > 0 ? (
-              <section className="flex flex-col gap-4">
-                <h2 className="text-sm font-medium text-muted-foreground">
-                  Entries
-                </h2>
-                {normalEntries.map(renderEntry)}
-              </section>
-            ) : (
-              normalEntries.map(renderEntry)
-            )
-          ) : !loading ? (
-            <p className="text-sm text-muted-foreground">
-              {entries.length === 0
-                ? 'No entries in summaries.db yet.'
-                : 'No entries match.'}
-            </p>
-          ) : null}
-        </div>
+        {!loading && entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {total === 0
+              ? 'No entries in summaries.db yet.'
+              : 'No entries match.'}
+          </p>
+        ) : null}
+
+        {entries.length > 0 || loadingMore || loadMoreError ? (
+          <VirtualizedList
+            rows={rows}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            onLoadMore={() => void loadMore()}
+            estimateSize={(row) => {
+              if (row.type === 'header') return 28
+              if (row.type === 'status') return 48
+              return 200
+            }}
+            renderRow={(row) => {
+              if (row.type === 'header') {
+                return (
+                  <h2 className="text-sm font-medium text-muted-foreground">
+                    {row.label}
+                  </h2>
+                )
+              }
+              if (row.type === 'status') {
+                return (
+                  <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+                    {loadMoreError ? (
+                      <>
+                        <span>{loadMoreError}</span>
+                        <Button variant="outline" size="sm" onClick={() => void loadMore()}>
+                          Retry
+                        </Button>
+                      </>
+                    ) : loadingMore || hasMore ? (
+                      <span>Loading more…</span>
+                    ) : null}
+                  </div>
+                )
+              }
+              return renderEntry(entries[row.index])
+            }}
+          />
+        ) : null}
 
         <Dialog open={bulkTagOpen} onOpenChange={setBulkTagOpen}>
           <DialogContent>
@@ -1174,6 +1172,7 @@ export default function SummariesView() {
             setBulkNotebookExistingOpen(open)
             if (!open) {
               setBulkNotebookPickerId(null)
+              setBulkNotebookFilterQuery('')
               setBulkNotebookError(null)
             }
           }}
@@ -1185,36 +1184,50 @@ export default function SummariesView() {
                 Choose an existing NotebookLM notebook. Selected YouTube URLs are added as sources.
               </DialogDescription>
             </DialogHeader>
-            <div className="flex max-h-72 flex-col gap-1 overflow-y-auto py-2">
-              {bulkNotebookOptionsLoading ? (
-                <p className="text-sm text-muted-foreground">Loading notebooks…</p>
-              ) : bulkNotebookOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No notebooks in the local cache. Sync from Library first.
-                </p>
-              ) : (
-                bulkNotebookOptions.map((notebook) => (
-                  <label
-                    key={notebook.id}
-                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60"
-                  >
-                    <input
-                      type="radio"
-                      name="bulk-notebook-target"
-                      checked={bulkNotebookPickerId === notebook.id}
-                      onChange={() => setBulkNotebookPickerId(notebook.id)}
-                      className={`${checkboxClassName} mt-1`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{notebook.title}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {notebook.source_count}{' '}
-                        {notebook.source_count === 1 ? 'source' : 'sources'}
+            <div className="flex flex-col gap-2 py-2">
+              <input
+                type="search"
+                value={bulkNotebookFilterQuery}
+                onChange={(event) => setBulkNotebookFilterQuery(event.target.value)}
+                placeholder="Search notebooks…"
+                aria-label="Search notebooks"
+                className={fieldClassName}
+                disabled={bulkNotebookOptionsLoading || bulkNotebookOptions.length === 0}
+                autoFocus
+              />
+              <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+                {bulkNotebookOptionsLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading notebooks…</p>
+                ) : bulkNotebookOptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No notebooks in the local cache. Sync from Library first.
+                  </p>
+                ) : filteredBulkNotebookOptions.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No notebooks match.</p>
+                ) : (
+                  filteredBulkNotebookOptions.map((notebook) => (
+                    <label
+                      key={notebook.id}
+                      className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60"
+                    >
+                      <input
+                        type="radio"
+                        name="bulk-notebook-target"
+                        checked={bulkNotebookPickerId === notebook.id}
+                        onChange={() => setBulkNotebookPickerId(notebook.id)}
+                        className={`${checkboxClassName} mt-1`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{notebook.title}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {notebook.source_count}{' '}
+                          {notebook.source_count === 1 ? 'source' : 'sources'}
+                        </span>
                       </span>
-                    </span>
-                  </label>
-                ))
-              )}
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
             {bulkNotebookError ? (
               <p className="text-sm text-destructive">{bulkNotebookError}</p>

@@ -1,12 +1,55 @@
+import {
+  buildListQueryString,
+  DEFAULT_PAGE_SIZE,
+  type ListPage,
+  type ListPageQuery,
+} from '@/lib/list-page'
 import type { NotebookRow } from '@/types'
 
-export async function fetchNotebooks(): Promise<NotebookRow[]> {
-  const response = await fetch('/api/notebooks')
+type NotebookListFilters = Omit<ListPageQuery, 'limit' | 'cursor'>
+
+const defaultNotebookFilters: NotebookListFilters = {
+  sort: 'created_desc',
+  view: 'all',
+  notebook: 'all',
+  tag: 'all',
+  search: '',
+  searchScope: 'all',
+  pinsAtTop: true,
+}
+
+export async function fetchNotebooksPage(
+  filters: Partial<NotebookListFilters> & { cursor?: string | null; limit?: number } = {},
+): Promise<ListPage<NotebookRow>> {
+  const qs = buildListQueryString({
+    ...defaultNotebookFilters,
+    ...filters,
+    limit: filters.limit ?? DEFAULT_PAGE_SIZE,
+    cursor: filters.cursor ?? null,
+  })
+  const response = await fetch(`/api/notebooks?${qs}`)
   if (!response.ok) {
     const payload = await response.json().catch(() => ({})) as { error?: string }
     throw new Error(payload.error ?? `HTTP ${response.status}`)
   }
-  return response.json() as Promise<NotebookRow[]>
+  return response.json() as Promise<ListPage<NotebookRow>>
+}
+
+/** Loads every notebook page - for pickers / sync consumers, not the Library list. */
+export async function fetchNotebooks(): Promise<NotebookRow[]> {
+  const items: NotebookRow[] = []
+  let cursor: string | null = null
+  do {
+    const page = await fetchNotebooksPage({
+      cursor,
+      limit: 100,
+      pinsAtTop: false,
+      sort: 'created_desc',
+    })
+    items.push(...page.items)
+    cursor = page.nextCursor
+  } while (cursor)
+  return items
 }
 
 export async function patchNotebook(

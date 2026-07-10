@@ -31,20 +31,22 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useNotebooks } from '@/hooks/useNotebooks'
+import { useInfiniteList } from '@/hooks/useInfiniteList'
 import { useThrottledValue } from '@/hooks/useThrottledValue'
 import {
-  filterNotebooks,
+  buildPinnedRows,
+  VirtualizedList,
+} from '@/components/VirtualizedList'
+import {
   formatTimestamp,
   PINS_AT_TOP_KEY,
   readPinsAtTop,
-  searchNotebooks,
   selectClassName,
-  sortNotebooks,
   type SearchScope,
   type SortKey,
   type ViewFilter,
 } from '@/lib/notebook-list'
-import { collectAllTags, normalizeTag } from '@/lib/tags'
+import { normalizeTag } from '@/lib/tags'
 import { cn } from '@/lib/utils'
 import type { NotebookRow } from '@/types'
 
@@ -542,7 +544,7 @@ function TagAccordion({
 }
 
 export default function LibraryView() {
-  const { notebooks, error, isLoading, sync, createNotebook, updateNotebook, renameNotebook, deleteNotebook } = useNotebooks()
+  const { sync, createNotebook, updateNotebook, renameNotebook, deleteNotebook } = useNotebooks()
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [tagFilter, setTagFilter] = useState('all')
@@ -563,9 +565,34 @@ export default function LibraryView() {
   const syncStartedAtRef = useRef(0)
   const syncVisualTimerRef = useRef<number | null>(null)
 
+  const listFilters = useMemo(() => ({
+    sort: sortKey,
+    view: viewFilter,
+    notebook: 'all' as const,
+    tag: tagFilter,
+    search: deferredFilterQuery,
+    searchScope,
+    pinsAtTop,
+  }), [sortKey, viewFilter, tagFilter, deferredFilterQuery, searchScope, pinsAtTop])
+
+  const {
+    items: notebooks,
+    tags: allTags,
+    total,
+    hasMore,
+    loading,
+    loadingMore,
+    error,
+    loadMoreError,
+    loadMore,
+    reload,
+    replaceItem,
+    removeItem,
+  } = useInfiniteList<NotebookRow>('/api/notebooks', listFilters)
+
   const [syncPending, setSyncPending] = useState(false)
   const isSyncing = syncPending
-  const isInitialLoad = isLoading && !syncPending
+  const isInitialLoad = loading && !syncPending
   const isBusy = isSyncing || isInitialLoad
   const syncActive = syncVisual === 'syncing'
   const syncSuccess = syncVisual === 'success'
@@ -579,14 +606,9 @@ export default function LibraryView() {
 
   useEffect(() => () => clearSyncVisualTimer(), [])
 
-
   useEffect(() => {
     localStorage.setItem(PINS_AT_TOP_KEY, String(pinsAtTop))
   }, [pinsAtTop])
-
-  const displayNotebooks = notebooks
-
-  const allTags = useMemo(() => collectAllTags(displayNotebooks), [displayNotebooks])
 
   useEffect(() => {
     if (tagFilter !== 'all' && !allTags.includes(tagFilter)) {
@@ -594,40 +616,23 @@ export default function LibraryView() {
     }
   }, [allTags, tagFilter])
 
-  const { pinnedNotebooks, normalNotebooks } = useMemo(() => {
-    const sorted = sortNotebooks(
-      searchNotebooks(
-        filterNotebooks(displayNotebooks, viewFilter, tagFilter),
-        deferredFilterQuery,
-        searchScope,
-      ),
-      sortKey,
-    )
-    if (!pinsAtTop) {
-      return { pinnedNotebooks: [] as NotebookRow[], normalNotebooks: sorted }
-    }
-    return {
-      pinnedNotebooks: sorted.filter((notebook) => notebook.pinned),
-      normalNotebooks: sorted.filter((notebook) => !notebook.pinned),
-    }
-  }, [displayNotebooks, sortKey, viewFilter, tagFilter, deferredFilterQuery, searchScope, pinsAtTop])
-
-  const visibleCount = pinnedNotebooks.length + normalNotebooks.length
-
-  const visibleNotebooks = useMemo(
-    () => [...pinnedNotebooks, ...normalNotebooks],
-    [pinnedNotebooks, normalNotebooks],
+  const rows = useMemo(
+    () =>
+      buildPinnedRows(notebooks, pinsAtTop, { pinned: 'Pinned', rest: 'Notebooks' }, {
+        showStatus: hasMore || loadingMore || Boolean(loadMoreError),
+      }),
+    [notebooks, pinsAtTop, hasMore, loadingMore, loadMoreError],
   )
 
   const selectedCount = selectedIds.size
 
   useEffect(() => {
-    const visibleIdSet = new Set(visibleNotebooks.map((n) => n.id))
+    const visibleIdSet = new Set(notebooks.map((n) => n.id))
     setSelectedIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIdSet.has(id)))
       return next.size === prev.size ? prev : next
     })
-  }, [visibleNotebooks])
+  }, [notebooks])
 
   const toggleSelected = useCallback((id: number, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -643,7 +648,7 @@ export default function LibraryView() {
   }
 
   function selectedNotebooks() {
-    return visibleNotebooks.filter((n) => selectedIds.has(n.id))
+    return notebooks.filter((n) => selectedIds.has(n.id))
   }
 
   const handleSync = async () => {
@@ -653,6 +658,7 @@ export default function LibraryView() {
     setSyncPending(true)
     try {
       await sync()
+      await reload()
       const remaining = Math.max(0, SYNC_MIN_ACTIVE_MS - (Date.now() - syncStartedAtRef.current))
       syncVisualTimerRef.current = window.setTimeout(() => {
         setSyncVisual('success')
@@ -674,6 +680,7 @@ export default function LibraryView() {
     setCreateError(null)
     try {
       const { notebook } = await createNotebook()
+      await reload()
       window.open(`${notebook.url}?addSource=true`, '_blank', 'noopener,noreferrer')
     } catch (createErr) {
       setCreateError(createErr instanceof Error ? createErr.message : String(createErr))
@@ -683,19 +690,23 @@ export default function LibraryView() {
   }
 
   async function handleRename(notebook: NotebookRow, title: string) {
-    await renameNotebook(notebook.id, notebook.notebooklm_id, title)
+    const updated = await renameNotebook(notebook.id, notebook.notebooklm_id, title)
+    replaceItem(updated)
   }
 
   async function handleDelete(notebook: NotebookRow) {
     await deleteNotebook(notebook.id, notebook.notebooklm_id)
+    removeItem(notebook.id)
   }
 
   async function handlePinned(notebook: NotebookRow) {
-    await updateNotebook(notebook.id, { pinned: !notebook.pinned })
+    const updated = await updateNotebook(notebook.id, { pinned: !notebook.pinned })
+    replaceItem(updated)
   }
 
   async function handleTagsChange(notebook: NotebookRow, tags: string[]) {
-    await updateNotebook(notebook.id, { tags })
+    const updated = await updateNotebook(notebook.id, { tags })
+    replaceItem(updated)
   }
 
   const cardActionsRef = useRef({
@@ -730,7 +741,8 @@ export default function LibraryView() {
   async function bulkSetPinned(pinned: boolean) {
     const targets = selectedNotebooks().filter((n) => Boolean(n.pinned) !== pinned)
     for (const notebook of targets) {
-      await updateNotebook(notebook.id, { pinned })
+      const updated = await updateNotebook(notebook.id, { pinned })
+      replaceItem(updated)
     }
   }
 
@@ -742,7 +754,8 @@ export default function LibraryView() {
     try {
       const targets = selectedNotebooks().filter((n) => !n.tags.includes(tag))
       for (const notebook of targets) {
-        await updateNotebook(notebook.id, { tags: [...notebook.tags, tag] })
+        const updated = await updateNotebook(notebook.id, { tags: [...notebook.tags, tag] })
+        replaceItem(updated)
       }
       setBulkTagOpen(false)
       setBulkTagDraft('')
@@ -757,6 +770,7 @@ export default function LibraryView() {
     try {
       for (const notebook of selectedNotebooks()) {
         await deleteNotebook(notebook.id, notebook.notebooklm_id)
+        removeItem(notebook.id)
       }
       clearSelection()
       setBulkDeleteOpen(false)
@@ -827,10 +841,8 @@ export default function LibraryView() {
                   <CheckIcon className="sync-check-pop size-3.5 text-primary" aria-hidden />
                   Updated
                 </span>
-              ) : visibleCount === displayNotebooks.length ? (
-                `${displayNotebooks.length} notebooks`
               ) : (
-                `${visibleCount} of ${displayNotebooks.length} notebooks`
+                `${total} notebooks`
               )}
             </p>
             <div className="flex flex-wrap items-center gap-3">
@@ -962,45 +974,63 @@ export default function LibraryView() {
           <div
             className={cn(
               'flex flex-col gap-4 sync-list-refresh',
-              syncActive && displayNotebooks.length > 0 && 'pointer-events-none opacity-45 saturate-50',
+              syncActive && notebooks.length > 0 && 'pointer-events-none opacity-45 saturate-50',
             )}
             aria-busy={syncActive}
           >
-          {(isBusy || syncActive) && displayNotebooks.length === 0 ? (
-            <>
-              <NotebookCardSkeleton index={0} />
-              <NotebookCardSkeleton index={1} />
-              <NotebookCardSkeleton index={2} />
-            </>
-          ) : null}
-          {!isBusy && !syncActive || displayNotebooks.length > 0 ? (
-          <>
-          {pinsAtTop && pinnedNotebooks.length > 0 ? (
-            <section className="flex flex-col gap-4">
-              <h2 className="text-sm font-medium text-muted-foreground">Pinned</h2>
-              {pinnedNotebooks.map((notebook, index) => renderNotebook(notebook, index))}
-            </section>
-          ) : null}
-          {normalNotebooks.length > 0 ? (
-            pinsAtTop && pinnedNotebooks.length > 0 ? (
-              <section className="flex flex-col gap-4">
-                <h2 className="text-sm font-medium text-muted-foreground">Notebooks</h2>
-                {normalNotebooks.map((notebook, index) =>
-                  renderNotebook(notebook, pinnedNotebooks.length + index),
-                )}
-              </section>
-            ) : (
-              normalNotebooks.map((notebook, index) => renderNotebook(notebook, index))
-            )
-          ) : !isBusy && !syncActive ? (
-            <p className="text-sm text-muted-foreground">
-              {displayNotebooks.length === 0
-                ? 'No notebooks in cache yet. Sync from NotebookLM to get started.'
-                : 'No notebooks match.'}
-            </p>
-          ) : null}
-          </>
-          ) : null}
+            {(isBusy || syncActive) && notebooks.length === 0 ? (
+              <>
+                <NotebookCardSkeleton index={0} />
+                <NotebookCardSkeleton index={1} />
+                <NotebookCardSkeleton index={2} />
+              </>
+            ) : null}
+            {!loading && notebooks.length === 0 && !syncActive ? (
+              <p className="text-sm text-muted-foreground">
+                {total === 0
+                  ? 'No notebooks in cache yet. Sync from NotebookLM to get started.'
+                  : 'No notebooks match.'}
+              </p>
+            ) : null}
+            {notebooks.length > 0 || loadingMore || loadMoreError ? (
+              <VirtualizedList
+                rows={rows}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                onLoadMore={() => void loadMore()}
+                estimateSize={(row) => {
+                  if (row.type === 'header') return 28
+                  if (row.type === 'status') return 48
+                  return 140
+                }}
+                renderRow={(row) => {
+                  if (row.type === 'header') {
+                    return (
+                      <h2 className="text-sm font-medium text-muted-foreground">
+                        {row.label}
+                      </h2>
+                    )
+                  }
+                  if (row.type === 'status') {
+                    return (
+                      <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+                        {loadMoreError ? (
+                          <>
+                            <span>{loadMoreError}</span>
+                            <Button variant="outline" size="sm" onClick={() => void loadMore()}>
+                              Retry
+                            </Button>
+                          </>
+                        ) : loadingMore || hasMore ? (
+                          <span>Loading more…</span>
+                        ) : null}
+                      </div>
+                    )
+                  }
+                  return renderNotebook(notebooks[row.index], row.index)
+                }}
+              />
+            ) : null}
           </div>
         </div>
 

@@ -3,8 +3,17 @@ import { getDbPath } from '../db/paths'
 import { notInArray } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import { notebooks } from '../db/schema'
+import type { ListPage, ListPageQuery } from '../lib/list-page'
 import { parseTags } from '../lib/tags'
 import type { NotebookRow, NotebookSyncPayload } from '../types'
+import {
+  buildCommonFilters,
+  buildOrderBy,
+  collectTagsFromRows,
+  decodeCursor,
+  encodeCursor,
+  whereSql,
+} from './list-page'
 
 export { getDbPath } from '../db/paths'
 
@@ -104,4 +113,52 @@ export function listCachedNotebooks(): NotebookRow[] {
       created_at: row.createdAt,
     }))
   })
+}
+
+export function listCachedNotebooksPage(query: ListPageQuery): ListPage<NotebookRow> {
+  const sqlite = new Database(getDbPath(), { readonly: true, fileMustExist: true })
+  try {
+    const filters = buildCommonFilters(query, {
+      searchColumns: { title: 'title', tags: 'tags' },
+    })
+    const where = whereSql(filters.clauses)
+    const orderBy = buildOrderBy(query.sort, query.pinsAtTop)
+    const offset = decodeCursor(query.cursor)?.offset ?? 0
+
+    const total = (sqlite.prepare(`
+      SELECT COUNT(*) AS count FROM notebooks ${where}
+    `).get(...filters.values) as { count: number }).count
+
+    const tags = collectTagsFromRows(
+      sqlite.prepare(`SELECT tags FROM notebooks`).all() as { tags: string }[],
+    )
+
+    const rows = sqlite.prepare(`
+      SELECT id, notebooklm_id, title, url, last_viewed, pinned, tags, source_count, created_at
+      FROM notebooks
+      ${where}
+      ORDER BY ${orderBy}
+      LIMIT ? OFFSET ?
+    `).all(...filters.values, query.limit, offset) as {
+      id: number
+      notebooklm_id: string
+      title: string
+      url: string
+      last_viewed: string | null
+      pinned: number
+      tags: string
+      source_count: number
+      created_at: string
+    }[]
+
+    const nextOffset = offset + rows.length
+    return {
+      items: rows.map(formatNotebookRow),
+      nextCursor: nextOffset < total ? encodeCursor({ offset: nextOffset }) : null,
+      tags,
+      total,
+    }
+  } finally {
+    sqlite.close()
+  }
 }

@@ -11,7 +11,13 @@ import {
   NOTEBOOK_URL_PREFIX,
   renameNotebookViaApi,
 } from './notebooklm/notebooklm'
-import { getDbPath, listCachedNotebooks, upsertNotebooks } from './notebook-db'
+import { parseListPageQuery } from '../lib/list-page'
+import {
+  getDbPath,
+  listCachedNotebooks,
+  listCachedNotebooksPage,
+  upsertNotebooks,
+} from './notebook-db'
 import { NOTEBOOKLM_AUTH_ERROR, withNotebooklmCookie } from './notebooklm/notebooklm-auth'
 import { syncRemoteNotebooksToCache } from './sync-remote'
 
@@ -67,9 +73,16 @@ function authErrorResponse(error: unknown) {
   return { statusCode: 502 as const, error: message }
 }
 
-function getNotebooks(_req: IncomingMessage, res: ServerResponse) {
+function getNotebooks(req: IncomingMessage, res: ServerResponse) {
   try {
-    sendJson(res, 200, listCachedNotebooks())
+    const url = new URL(req.url ?? '/', 'http://localhost')
+    sendJson(
+      res,
+      200,
+      listCachedNotebooksPage(
+        parseListPageQuery(url.searchParams, { allowNotebookFilter: false }),
+      ),
+    )
   } catch (error) {
     sendJson(res, 500, { error: String(error) })
   }

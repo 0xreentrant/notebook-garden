@@ -55,22 +55,24 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useThrottledValue } from '@/hooks/useThrottledValue'
+import { useInfiniteList } from '@/hooks/useInfiniteList'
+import {
+  buildPinnedRows,
+  VirtualizedList,
+} from '@/components/VirtualizedList'
 import {
   BOOKMARK_PINS_AT_TOP_KEY,
-  filterBookmarks,
   formatTimestamp,
   readBookmarkPinsAtTop,
-  searchBookmarks,
   selectClassName,
-  sortBookmarks,
   type NotebookFilter,
   type SearchScope,
   type SortKey,
   type ViewFilter,
 } from '@/lib/bookmark-list'
-import { collectAllTags, normalizeTag } from '@/lib/tags'
+import { normalizeTag } from '@/lib/tags'
 import { truncateNotebookTitle } from '@/lib/notebook-links'
-import { sortNotebooks } from '@/lib/notebook-list'
+import { searchNotebooks, sortNotebooks } from '@/lib/notebook-list'
 import type { BookmarkRow, NotebookRow } from '@/types'
 
 const fieldClassName =
@@ -451,7 +453,6 @@ function BookmarkSearch({
 }
 
 export default function BookmarksView() {
-  const [bookmarks, setBookmarks] = useState<BookmarkRow[]>([])
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [notebookFilter, setNotebookFilter] = useState<NotebookFilter>('all')
@@ -473,37 +474,24 @@ export default function BookmarksView() {
   const [bulkNotebookPickerId, setBulkNotebookPickerId] = useState<number | null>(null)
   const [bulkNotebookOptions, setBulkNotebookOptions] = useState<NotebookRow[]>([])
   const [bulkNotebookOptionsLoading, setBulkNotebookOptionsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [bulkNotebookFilterQuery, setBulkNotebookFilterQuery] = useState('')
+  const deferredBulkNotebookFilterQuery = useDeferredValue(bulkNotebookFilterQuery)
+  const filteredBulkNotebookOptions = useMemo(
+    () => searchNotebooks(bulkNotebookOptions, deferredBulkNotebookFilterQuery),
+    [bulkNotebookOptions, deferredBulkNotebookFilterQuery],
+  )
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
 
-  const allTags = useMemo(() => collectAllTags(bookmarks), [bookmarks])
-
-  useEffect(() => {
-    if (tagFilter !== 'all' && !allTags.includes(tagFilter)) {
-      setTagFilter('all')
-    }
-  }, [allTags, tagFilter])
-
-  const { pinnedBookmarks, normalBookmarks } = useMemo(() => {
-    const sorted = sortBookmarks(
-      searchBookmarks(
-        filterBookmarks(bookmarks, viewFilter, notebookFilter, tagFilter),
-        deferredFilterQuery,
-        searchScope,
-      ),
-      sortKey,
-    )
-    if (!pinsAtTop) {
-      return { pinnedBookmarks: [] as BookmarkRow[], normalBookmarks: sorted }
-    }
-    return {
-      pinnedBookmarks: sorted.filter((bookmark) => bookmark.pinned),
-      normalBookmarks: sorted.filter((bookmark) => !bookmark.pinned),
-    }
-  }, [
-    bookmarks,
+  const listFilters = useMemo(() => ({
+    sort: sortKey,
+    view: viewFilter,
+    notebook: notebookFilter,
+    tag: tagFilter,
+    search: deferredFilterQuery,
+    searchScope,
+    pinsAtTop,
+  }), [
     sortKey,
     viewFilter,
     notebookFilter,
@@ -513,50 +501,49 @@ export default function BookmarksView() {
     pinsAtTop,
   ])
 
-  const visibleCount = pinnedBookmarks.length + normalBookmarks.length
-  const visibleBookmarks = useMemo(
-    () => [...pinnedBookmarks, ...normalBookmarks],
-    [pinnedBookmarks, normalBookmarks],
-  )
-  const selectedCount = selectedIds.size
+  const {
+    items: bookmarks,
+    tags: allTags,
+    total,
+    hasMore,
+    loading,
+    loadingMore,
+    error,
+    loadMoreError,
+    loadMore,
+    reload,
+    replaceItem: replaceBookmark,
+    removeItem,
+    setError,
+  } = useInfiniteList<BookmarkRow>('/api/bookmarks', listFilters)
 
   useEffect(() => {
-    const visibleIdSet = new Set(visibleBookmarks.map((bookmark) => bookmark.id))
+    if (tagFilter !== 'all' && !allTags.includes(tagFilter)) {
+      setTagFilter('all')
+    }
+  }, [allTags, tagFilter])
+
+  const selectedCount = selectedIds.size
+
+  const rows = useMemo(
+    () =>
+      buildPinnedRows(bookmarks, pinsAtTop, { pinned: 'Pinned', rest: 'Bookmarks' }, {
+        showStatus: hasMore || loadingMore || Boolean(loadMoreError),
+      }),
+    [bookmarks, pinsAtTop, hasMore, loadingMore, loadMoreError],
+  )
+
+  useEffect(() => {
+    const visibleIdSet = new Set(bookmarks.map((bookmark) => bookmark.id))
     setSelectedIds((prev) => {
       const next = new Set([...prev].filter((id) => visibleIdSet.has(id)))
       return next.size === prev.size ? prev : next
     })
-  }, [visibleBookmarks])
+  }, [bookmarks])
 
   useEffect(() => {
     localStorage.setItem(BOOKMARK_PINS_AT_TOP_KEY, String(pinsAtTop))
   }, [pinsAtTop])
-
-  const loadBookmarks = useCallback(async () => {
-    const response = await fetch('/api/bookmarks')
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}))
-      throw new Error(payload.error ?? `HTTP ${response.status}`)
-    }
-    setBookmarks((await response.json()) as BookmarkRow[])
-    setError(null)
-  }, [])
-
-  useEffect(() => {
-    loadBookmarks()
-      .catch((fetchError: Error) => {
-        setError(fetchError.message)
-      })
-      .finally(() => {
-        setLoading(false)
-      })
-  }, [loadBookmarks])
-
-  const replaceBookmark = useCallback((updated: BookmarkRow) => {
-    setBookmarks((current) =>
-      current.map((bookmark) => (bookmark.id === updated.id ? updated : bookmark)),
-    )
-  }, [])
 
   const deleteBookmark = useCallback(async (id: number) => {
     const response = await fetch(`/api/bookmarks/${id}`, { method: 'DELETE' })
@@ -564,8 +551,8 @@ export default function BookmarksView() {
       const payload = await response.json().catch(() => ({}))
       throw new Error(payload.error ?? `HTTP ${response.status}`)
     }
-    setBookmarks((current) => current.filter((bookmark) => bookmark.id !== id))
-  }, [])
+    removeItem(id)
+  }, [removeItem])
 
   const toggleSelected = useCallback((id: number, checked: boolean) => {
     setSelectedIds((prev) => {
@@ -581,7 +568,7 @@ export default function BookmarksView() {
   }
 
   function selectedBookmarks() {
-    return visibleBookmarks.filter((bookmark) => selectedIds.has(bookmark.id))
+    return bookmarks.filter((bookmark) => selectedIds.has(bookmark.id))
   }
 
   const handleTagsChange = useCallback(
@@ -612,7 +599,7 @@ export default function BookmarksView() {
       if (!response.ok) {
         throw new Error(payload.error ?? `HTTP ${response.status}`)
       }
-      await loadBookmarks()
+      await reload()
       setSyncMessage(
         `Synced ${payload.inserted ?? 0} new · ${payload.skipped ?? 0} already present` +
           (payload.profiles?.length ? ` · ${payload.profiles.join(', ')}` : ''),
@@ -721,6 +708,7 @@ export default function BookmarksView() {
   async function openBulkNotebookExistingModal() {
     setBulkNotebookError(null)
     setBulkNotebookPickerId(null)
+    setBulkNotebookFilterQuery('')
     setBulkNotebookExistingOpen(true)
     setBulkNotebookOptionsLoading(true)
     try {
@@ -808,13 +796,9 @@ export default function BookmarksView() {
           <p className="text-sm text-muted-foreground">{syncMessage}</p>
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
-            {loading
-              ? 'Loading bookmarks…'
-              : visibleCount === bookmarks.length
-                ? `${bookmarks.length} bookmarks`
-                : `${visibleCount} of ${bookmarks.length} bookmarks`}
-          </p>
+            <p className="text-sm text-muted-foreground">
+              {loading ? 'Loading bookmarks…' : `${total} bookmarks`}
+            </p>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-muted-foreground">
               <input
@@ -942,30 +926,53 @@ export default function BookmarksView() {
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-4">
-        {pinsAtTop && pinnedBookmarks.length > 0 ? (
-          <section className="flex flex-col gap-4">
-            <h2 className="text-sm font-medium text-muted-foreground">Pinned</h2>
-            {pinnedBookmarks.map(renderBookmark)}
-          </section>
-        ) : null}
-        {normalBookmarks.length > 0 ? (
-          pinsAtTop && pinnedBookmarks.length > 0 ? (
-            <section className="flex flex-col gap-4">
-              <h2 className="text-sm font-medium text-muted-foreground">Bookmarks</h2>
-              {normalBookmarks.map(renderBookmark)}
-            </section>
-          ) : (
-            normalBookmarks.map(renderBookmark)
-          )
-        ) : !loading ? (
-          <p className="text-sm text-muted-foreground">
-            {bookmarks.length === 0
-              ? 'No bookmarks yet. Sync from Chrome to import.'
-              : 'No bookmarks match.'}
-          </p>
-        ) : null}
-      </div>
+      {!loading && bookmarks.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {total === 0
+            ? 'No bookmarks yet. Sync from Chrome to import.'
+            : 'No bookmarks match.'}
+        </p>
+      ) : null}
+
+      {bookmarks.length > 0 || loadingMore || loadMoreError ? (
+        <VirtualizedList
+          rows={rows}
+          hasMore={hasMore}
+          loadingMore={loadingMore}
+          onLoadMore={() => void loadMore()}
+          estimateSize={(row) => {
+            if (row.type === 'header') return 28
+            if (row.type === 'status') return 48
+            return 160
+          }}
+          renderRow={(row) => {
+            if (row.type === 'header') {
+              return (
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  {row.label}
+                </h2>
+              )
+            }
+            if (row.type === 'status') {
+              return (
+                <div className="flex items-center justify-center gap-2 py-2 text-sm text-muted-foreground">
+                  {loadMoreError ? (
+                    <>
+                      <span>{loadMoreError}</span>
+                      <Button variant="outline" size="sm" onClick={() => void loadMore()}>
+                        Retry
+                      </Button>
+                    </>
+                  ) : loadingMore || hasMore ? (
+                    <span>Loading more…</span>
+                  ) : null}
+                </div>
+              )
+            }
+            return renderBookmark(bookmarks[row.index])
+          }}
+        />
+      ) : null}
 
       <Dialog open={bulkTagOpen} onOpenChange={setBulkTagOpen}>
         <DialogContent>
@@ -1003,6 +1010,7 @@ export default function BookmarksView() {
           setBulkNotebookExistingOpen(open)
           if (!open) {
             setBulkNotebookPickerId(null)
+            setBulkNotebookFilterQuery('')
             setBulkNotebookError(null)
           }
         }}
@@ -1014,36 +1022,50 @@ export default function BookmarksView() {
               Choose an existing NotebookLM notebook. Selected URLs are added as sources.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex max-h-72 flex-col gap-1 overflow-y-auto py-2">
-            {bulkNotebookOptionsLoading ? (
-              <p className="text-sm text-muted-foreground">Loading notebooks…</p>
-            ) : bulkNotebookOptions.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No notebooks in the local cache. Sync from Library first.
-              </p>
-            ) : (
-              bulkNotebookOptions.map((notebook) => (
-                <label
-                  key={notebook.id}
-                  className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60"
-                >
-                  <input
-                    type="radio"
-                    name="bulk-bookmark-notebook-target"
-                    checked={bulkNotebookPickerId === notebook.id}
-                    onChange={() => setBulkNotebookPickerId(notebook.id)}
-                    className={`${checkboxClassName} mt-1`}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium">{notebook.title}</span>
-                    <span className="block text-xs text-muted-foreground">
-                      {notebook.source_count}{' '}
-                      {notebook.source_count === 1 ? 'source' : 'sources'}
+          <div className="flex flex-col gap-2 py-2">
+            <input
+              type="search"
+              value={bulkNotebookFilterQuery}
+              onChange={(event) => setBulkNotebookFilterQuery(event.target.value)}
+              placeholder="Search notebooks…"
+              aria-label="Search notebooks"
+              className={fieldClassName}
+              disabled={bulkNotebookOptionsLoading || bulkNotebookOptions.length === 0}
+              autoFocus
+            />
+            <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
+              {bulkNotebookOptionsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading notebooks…</p>
+              ) : bulkNotebookOptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No notebooks in the local cache. Sync from Library first.
+                </p>
+              ) : filteredBulkNotebookOptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No notebooks match.</p>
+              ) : (
+                filteredBulkNotebookOptions.map((notebook) => (
+                  <label
+                    key={notebook.id}
+                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60"
+                  >
+                    <input
+                      type="radio"
+                      name="bulk-bookmark-notebook-target"
+                      checked={bulkNotebookPickerId === notebook.id}
+                      onChange={() => setBulkNotebookPickerId(notebook.id)}
+                      className={`${checkboxClassName} mt-1`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{notebook.title}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {notebook.source_count}{' '}
+                        {notebook.source_count === 1 ? 'source' : 'sources'}
+                      </span>
                     </span>
-                  </span>
-                </label>
-              ))
-            )}
+                  </label>
+                ))
+              )}
+            </div>
           </div>
           {bulkNotebookError ? (
             <p className="text-sm text-destructive">{bulkNotebookError}</p>

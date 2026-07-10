@@ -44,12 +44,30 @@ function seedDb() {
       source_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (current_timestamp)
     );
+    CREATE TABLE bookmarks (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      url TEXT NOT NULL UNIQUE,
+      title TEXT NOT NULL,
+      folder_path TEXT NOT NULL DEFAULT '',
+      chrome_profile TEXT NOT NULL,
+      notebooklm_url TEXT,
+      notebooklm_links TEXT NOT NULL DEFAULT '[]',
+      last_viewed TEXT,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      tags TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    );
     INSERT INTO summary_entries (
       video_id, title, url, status, skip_backfill, summary_text, tags, created_at, updated_at
-    ) VALUES (
-      'abc123', 'Test video', 'https://youtube.com/watch?v=abc123', 'complete', 0, 'Summary body', '[]',
-      '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'
-    );
+    ) VALUES
+      ('abc123', 'Test video', 'https://youtube.com/watch?v=abc123', 'complete', 0, 'Summary body', '["plant"]',
+       '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
+      ('def456', 'Garden tips', 'https://youtube.com/watch?v=def456', 'complete', 0, 'More', '[]',
+       '2026-01-02T00:00:00Z', '2026-01-02T00:00:00Z'),
+      ('ghi789', 'Soil science', 'https://youtube.com/watch?v=ghi789', 'complete', 0, 'Dirt', '["plant"]',
+       '2026-01-03T00:00:00Z', '2026-01-03T00:00:00Z');
     INSERT INTO notebooks (notebooklm_id, title, url, source_count, created_at)
     VALUES (
       '00000000-0000-4000-8000-000000000001',
@@ -57,6 +75,12 @@ function seedDb() {
       'https://notebooklm.google.com/notebook/00000000-0000-4000-8000-000000000001',
       2,
       '2026-01-02T00:00:00Z'
+    );
+    INSERT INTO bookmarks (
+      url, title, folder_path, chrome_profile, tags, created_at, updated_at
+    ) VALUES (
+      'https://example.com', 'Example', 'Bookmarks Bar', 'Default', '[]',
+      '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'
     );
   `)
   db.close()
@@ -80,22 +104,55 @@ describe('notebook-garden API e2e', () => {
     expect(await res.json()).toEqual({ ok: true })
   })
 
-  it('lists summary entries', async () => {
+  it('lists summary entries as a page', async () => {
     const app = createApp()
-    const res = await request(app, 'http://localhost/api/entries')
+    const res = await request(app, 'http://localhost/api/entries?limit=2')
     expect(res.status).toBe(200)
-    const rows = await res.json()
-    expect(rows).toHaveLength(1)
-    expect(rows[0].video_id).toBe('abc123')
+    const page = await res.json()
+    expect(page.items).toHaveLength(2)
+    expect(page.total).toBe(3)
+    expect(page.nextCursor).toBeTruthy()
+    expect(page.items[0].video_id).toBe('ghi789')
   })
 
-  it('lists cached notebooks', async () => {
+  it('loads the next entries page', async () => {
+    const app = createApp()
+    const first = await (await request(app, 'http://localhost/api/entries?limit=2')).json()
+    const second = await (
+      await request(app, `http://localhost/api/entries?limit=2&cursor=${first.nextCursor}`)
+    ).json()
+    expect(second.items).toHaveLength(1)
+    expect(second.nextCursor).toBeNull()
+    expect(second.items[0].video_id).toBe('abc123')
+  })
+
+  it('filters entries by search and tag', async () => {
+    const app = createApp()
+    const res = await request(
+      app,
+      'http://localhost/api/entries?search=soil&tag=plant&limit=50',
+    )
+    const page = await res.json()
+    expect(page.total).toBe(1)
+    expect(page.items[0].title).toBe('Soil science')
+  })
+
+  it('lists cached notebooks as a page', async () => {
     const app = createApp()
     const res = await request(app, 'http://localhost/api/notebooks')
     expect(res.status).toBe(200)
-    const rows = await res.json()
-    expect(rows).toHaveLength(1)
-    expect(rows[0].title).toBe('Garden notebook')
+    const page = await res.json()
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0].title).toBe('Garden notebook')
+  })
+
+  it('lists bookmarks as a page', async () => {
+    const app = createApp()
+    const res = await request(app, 'http://localhost/api/bookmarks')
+    expect(res.status).toBe(200)
+    const page = await res.json()
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0].title).toBe('Example')
   })
 
   it('patches entry tags', async () => {
@@ -128,7 +185,8 @@ describe('notebook-garden API e2e', () => {
     expect(del.status).toBe(204)
 
     const list = await request(app, 'http://localhost/api/entries')
-    expect(await list.json()).toHaveLength(0)
+    const page = await list.json()
+    expect(page.total).toBe(2)
 
     const db = new Database(getDbPath(), { readonly: true })
     const row = db.prepare('SELECT deleted_at FROM summary_entries WHERE id = 1').get() as

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { getDbPath } from '../db/paths'
+import type { ListPage, ListPageQuery } from '../lib/list-page'
 import {
   appendNotebookLink,
   parseNotebookLinks,
@@ -9,6 +10,14 @@ import {
 import { parseTags, serializeTags } from '../lib/tags'
 import { collectChromeBookmarks } from './chrome-bookmarks'
 import { NOTEBOOKLM_URL_PREFIX } from './entries-api'
+import {
+  buildCommonFilters,
+  buildOrderBy,
+  collectTagsFromRows,
+  decodeCursor,
+  encodeCursor,
+  whereSql,
+} from './list-page'
 
 export const BOOKMARK_COLUMNS = `
   id, url, title, folder_path, chrome_profile,
@@ -75,6 +84,50 @@ export function listBookmarks() {
       ORDER BY created_at DESC, id DESC
     `).all() as RawBookmarkRow[]
     return rows.map(formatBookmarkRow)
+  } finally {
+    db.close()
+  }
+}
+
+export function listBookmarksPage(query: ListPageQuery): ListPage<ReturnType<typeof formatBookmarkRow>> {
+  const db = openDb(true)
+  try {
+    const filters = buildCommonFilters(query, {
+      deletedAt: true,
+      notebookLinksColumn: 'notebooklm_links',
+      searchColumns: {
+        title: 'title',
+        tags: 'tags',
+        extra: ['folder_path', 'chrome_profile', 'url'],
+      },
+    })
+    const where = whereSql(filters.clauses)
+    const orderBy = buildOrderBy(query.sort, query.pinsAtTop)
+    const offset = decodeCursor(query.cursor)?.offset ?? 0
+
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS count FROM bookmarks ${where}
+    `).get(...filters.values) as { count: number }).count
+
+    const tags = collectTagsFromRows(
+      db.prepare(`SELECT tags FROM bookmarks WHERE deleted_at IS NULL`).all() as { tags: string }[],
+    )
+
+    const rows = db.prepare(`
+      SELECT ${BOOKMARK_COLUMNS}
+      FROM bookmarks
+      ${where}
+      ORDER BY ${orderBy}
+      LIMIT ? OFFSET ?
+    `).all(...filters.values, query.limit, offset) as RawBookmarkRow[]
+
+    const nextOffset = offset + rows.length
+    return {
+      items: rows.map(formatBookmarkRow),
+      nextCursor: nextOffset < total ? encodeCursor({ offset: nextOffset }) : null,
+      tags,
+      total,
+    }
   } finally {
     db.close()
   }

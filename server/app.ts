@@ -1,18 +1,24 @@
 import { Hono } from 'hono'
 import Database from 'better-sqlite3'
 import { parseTags, serializeTags } from '../src/lib/tags'
+import { parseListPageQuery } from '../src/lib/list-page'
 import {
-  listEntries,
+  listEntriesPage,
   patchEntry,
   softDeleteEntry,
 } from '../src/server/entries-api'
 import {
-  listBookmarks,
+  listBookmarksPage,
   patchBookmark,
   softDeleteBookmark,
   syncBookmarksFromChrome,
 } from '../src/server/bookmarks-api'
-import { getDbPath, listCachedNotebooks, upsertNotebooks } from '../src/server/notebook-db'
+import {
+  getDbPath,
+  listCachedNotebooks,
+  listCachedNotebooksPage,
+  upsertNotebooks,
+} from '../src/server/notebook-db'
 import { createNotebooklmImport, createNotebooklmBulkImport, addSourcesToNotebooklm } from '../src/server/notebooklm-routes'
 import {
   createNotebookViaApi,
@@ -69,7 +75,7 @@ export function createApp() {
 
   app.get('/api/entries', (c) => {
     try {
-      return c.json(listEntries())
+      return c.json(listEntriesPage(parseListPageQuery(new URL(c.req.url).searchParams)))
     } catch (error) {
       return c.json({ error: String(error) }, 500)
     }
@@ -110,7 +116,7 @@ export function createApp() {
 
   app.get('/api/bookmarks', (c) => {
     try {
-      return c.json(listBookmarks())
+      return c.json(listBookmarksPage(parseListPageQuery(new URL(c.req.url).searchParams)))
     } catch (error) {
       return c.json({ error: String(error) }, 500)
     }
@@ -247,7 +253,13 @@ export function createApp() {
 
   app.get('/api/notebooks', (c) => {
     try {
-      return c.json(listCachedNotebooks())
+      return c.json(
+        listCachedNotebooksPage(
+          parseListPageQuery(new URL(c.req.url).searchParams, {
+            allowNotebookFilter: false,
+          }),
+        ),
+      )
     } catch (error) {
       return c.json({ error: String(error) }, 500)
     }

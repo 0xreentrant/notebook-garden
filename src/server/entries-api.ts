@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { getDbPath } from '../db/paths'
+import type { ListPage, ListPageQuery } from '../lib/list-page'
 import {
   appendNotebookLink,
   parseNotebookLinks,
@@ -7,6 +8,14 @@ import {
   type NotebookLink,
 } from '../lib/notebook-links'
 import { parseTags, serializeTags } from '../lib/tags'
+import {
+  buildCommonFilters,
+  buildOrderBy,
+  collectTagsFromRows,
+  decodeCursor,
+  encodeCursor,
+  whereSql,
+} from './list-page'
 
 export const NOTEBOOKLM_URL_PREFIX = 'https://notebooklm.google.com/notebook/'
 
@@ -80,6 +89,48 @@ export function listEntries() {
       ORDER BY created_at DESC, id DESC
     `).all() as RawEntryRow[]
     return rows.map(formatEntryRow)
+  } finally {
+    db.close()
+  }
+}
+
+export function listEntriesPage(query: ListPageQuery): ListPage<ReturnType<typeof formatEntryRow>> {
+  const db = openDb(true)
+  try {
+    const filters = buildCommonFilters(query, {
+      deletedAt: true,
+      notebookLinksColumn: 'notebooklm_links',
+      searchColumns: { title: 'title', tags: 'tags' },
+    })
+    const where = whereSql(filters.clauses)
+    const orderBy = buildOrderBy(query.sort, query.pinsAtTop)
+    const offset = decodeCursor(query.cursor)?.offset ?? 0
+
+    // ponytail: offset pages are fine for personal SQLite; upgrade to keyset if concurrent writes cause skips
+
+    const total = (db.prepare(`
+      SELECT COUNT(*) AS count FROM summary_entries ${where}
+    `).get(...filters.values) as { count: number }).count
+
+    const tags = collectTagsFromRows(
+      db.prepare(`SELECT tags FROM summary_entries WHERE deleted_at IS NULL`).all() as { tags: string }[],
+    )
+
+    const rows = db.prepare(`
+      SELECT ${ENTRY_COLUMNS}
+      FROM summary_entries
+      ${where}
+      ORDER BY ${orderBy}
+      LIMIT ? OFFSET ?
+    `).all(...filters.values, query.limit, offset) as RawEntryRow[]
+
+    const nextOffset = offset + rows.length
+    return {
+      items: rows.map(formatEntryRow),
+      nextCursor: nextOffset < total ? encodeCursor({ offset: nextOffset }) : null,
+      tags,
+      total,
+    }
   } finally {
     db.close()
   }

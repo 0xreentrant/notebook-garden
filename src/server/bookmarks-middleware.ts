@@ -1,7 +1,8 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Connect } from 'vite'
+import { parseListPageQuery } from '../lib/list-page'
 import {
-  listBookmarks,
+  listBookmarksPage,
   patchBookmark,
   softDeleteBookmark,
   syncBookmarksFromChrome,
@@ -13,12 +14,13 @@ export function bookmarksMiddleware(
   res: ServerResponse,
   next: Connect.NextFunction,
 ) {
-  const pathname = (req.url ?? '/').split('?')[0]
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const pathname = url.pathname
   const idMatch = pathname.match(/^\/(\d+)\/?$/)
 
   if (req.method === 'GET' && (pathname === '/' || pathname === '')) {
     try {
-      sendJson(res, 200, listBookmarks())
+      sendJson(res, 200, listBookmarksPage(parseListPageQuery(url.searchParams)))
     } catch (error) {
       sendJson(res, 500, { error: String(error) })
     }

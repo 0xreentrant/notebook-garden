@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Connect } from 'vite'
-import { listEntries, patchEntry, softDeleteEntry } from './entries-api'
+import { parseListPageQuery } from '../lib/list-page'
+import { listEntriesPage, patchEntry, softDeleteEntry } from './entries-api'
 import { readJsonBody, sendJson } from './http-utils'
 
 export function entriesMiddleware(
@@ -8,12 +9,13 @@ export function entriesMiddleware(
   res: ServerResponse,
   next: Connect.NextFunction,
 ) {
-  const pathname = (req.url ?? '/').split('?')[0]
+  const url = new URL(req.url ?? '/', 'http://localhost')
+  const pathname = url.pathname
   const idMatch = pathname.match(/^\/(\d+)\/?$/)
 
   if (req.method === 'GET' && (pathname === '/' || pathname === '')) {
     try {
-      sendJson(res, 200, listEntries())
+      sendJson(res, 200, listEntriesPage(parseListPageQuery(url.searchParams)))
     } catch (error) {
       sendJson(res, 500, { error: String(error) })
     }
