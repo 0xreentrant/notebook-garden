@@ -1,0 +1,97 @@
+import Database from 'better-sqlite3'
+import { getDbPath } from '../db/paths'
+import { notInArray } from 'drizzle-orm'
+import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { notebooks } from '../db/schema'
+import { parseTags } from '../lib/tags'
+import type { NotebookRow, NotebookSyncPayload } from '../types'
+
+export { getDbPath } from '../db/paths'
+
+function formatNotebookRow(raw: {
+  id: number
+  notebooklm_id: string
+  title: string
+  url: string
+  last_viewed: string | null
+  pinned: number
+  tags: string
+  source_count: number
+  created_at: string
+}): NotebookRow {
+  return {
+    id: raw.id,
+    notebooklm_id: raw.notebooklm_id,
+    title: raw.title,
+    url: raw.url,
+    last_viewed: raw.last_viewed,
+    pinned: raw.pinned,
+    tags: parseTags(raw.tags),
+    source_count: raw.source_count,
+    created_at: raw.created_at,
+  }
+}
+
+function withDb<T>(fn: (db: ReturnType<typeof drizzle>) => T): T {
+  const sqlite = new Database(getDbPath())
+  sqlite.pragma('journal_mode = WAL')
+  sqlite.pragma('foreign_keys = ON')
+  const db = drizzle(sqlite, { schema: { notebooks } })
+  try {
+    return fn(db)
+  } finally {
+    sqlite.close()
+  }
+}
+
+export function upsertNotebooks(items: NotebookSyncPayload[]) {
+  withDb((db) => {
+    for (const item of items) {
+      const createdAt = item.created_at ?? new Date().toISOString()
+      db.insert(notebooks)
+        .values({
+          notebooklmId: item.notebooklmId,
+          title: item.title,
+          url: item.url,
+          createdAt,
+          lastViewed: item.last_viewed ?? null,
+          sourceCount: item.source_count ?? 0,
+        })
+        .onConflictDoUpdate({
+          target: notebooks.notebooklmId,
+          set: {
+            title: item.title,
+            url: item.url,
+            ...(item.created_at != null ? { createdAt: item.created_at } : {}),
+            lastViewed: item.last_viewed ?? null,
+            ...(item.source_count != null ? { sourceCount: item.source_count } : {}),
+          },
+        })
+        .run()
+    }
+
+    const remoteIds = items.map((item) => item.notebooklmId)
+    if (remoteIds.length === 0) {
+      db.delete(notebooks).run()
+    } else {
+      db.delete(notebooks).where(notInArray(notebooks.notebooklmId, remoteIds)).run()
+    }
+  })
+}
+
+export function listCachedNotebooks(): NotebookRow[] {
+  return withDb((db) => {
+    const rows = db.select().from(notebooks).all()
+    return rows.map((row) => formatNotebookRow({
+      id: row.id,
+      notebooklm_id: row.notebooklmId,
+      title: row.title,
+      url: row.url,
+      last_viewed: row.lastViewed,
+      pinned: row.pinned,
+      tags: row.tags,
+      source_count: row.sourceCount,
+      created_at: row.createdAt,
+    }))
+  })
+}

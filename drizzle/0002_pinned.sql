@@ -1,0 +1,1 @@
+ALTER TABLE `summary_entries` ADD `pinned` integer DEFAULT 0 NOT NULL;

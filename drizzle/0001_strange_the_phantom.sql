@@ -1,0 +1,1 @@
+ALTER TABLE `summary_entries` ADD `last_viewed` text;

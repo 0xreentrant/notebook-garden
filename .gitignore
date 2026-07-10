@@ -1,0 +1,13 @@
+summaries.db
+summaries.db-wal
+summaries.db-shm
+test-app-e2e.db
+test-app-e2e.db-wal
+test-app-e2e.db-shm
+local.db
+.env
+node_modules/
+dist/
+.drizzle/
+*.local
+__pycache__/

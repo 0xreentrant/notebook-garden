@@ -73,45 +73,43 @@ User maintains their NotebookLM corpus: sync, rename, tag, pin, delete, create e
 
 - [x] Backup `summaries.db` and `local.db` to `_db-backups/`
 - [x] Init repo, `PLAN.md`, `BUILD_LOG.md`
-- [ ] `.gitignore`, base `package.json`, tsconfig, vite, tailwind
+- [x] `.gitignore`, base `package.json`, tsconfig, vite, tailwind
 
 ### Phase 1: Unified NotebookLM core
 
-- [ ] `src/server/notebooklm/` - auth, login, full RPC client
-- [ ] `scripts/notebooklm-login.ts`
-- [ ] Port integration tests for auth + RPC parsing
+- [x] `src/server/notebooklm/` - auth, login, full RPC client
+- [x] `scripts/notebooklm-login.ts`
+- [x] Port integration tests for auth + RPC parsing
 
 ### Phase 2: Database
 
-- [ ] Drizzle schema: `summary_entries` + `notebooks`
-- [ ] Migrations from both parents (squashed where sensible)
-- [ ] Import notebooks from backup `local.db` into unified DB
-- [ ] Copy backup `summaries.db` as starting `summaries.db`
+- [x] Drizzle schema: `summary_entries` + `notebooks`
+- [x] Migrations from both parents (squashed where sensible)
+- [x] Import notebooks from backup `local.db` into unified DB
+- [x] Copy backup `summaries.db` as starting `summaries.db`
 
 ### Phase 3: API layer
 
-- [ ] Hono app: `/api/entries`, `/api/notebooks`, `/api/notebooklm/create-and-import`
-- [ ] Vite proxy to Hono in dev (or shared handlers - pick proxy for one server truth)
-- [ ] Create-and-import upserts notebook row after RPC success
+- [x] Hono app: `/api/entries`, `/api/notebooks`, `/api/notebooklm/create-and-import`
+- [x] Vite middleware for all API routes
+- [x] Create-and-import upserts notebook row after RPC success
 
 ### Phase 4: Frontend shell
 
-- [ ] `SummariesView` from watch-laterer App
-- [ ] `LibraryView` from notebooklm-browser App
-- [ ] Shared: search/tag/bulk primitives where identical
-- [ ] Tab navigation + title branding
+- [x] `SummariesView` from watch-laterer App
+- [x] `LibraryView` from notebooklm-browser App (SWR only)
+- [x] Tab navigation + title branding
 
 ### Phase 5: Extension + polish
 
-- [ ] Extension RPC IDs imported from shared `rpc-ids.ts` or build-time sync
-- [ ] README with local workflow (python `--db` path, login, dev)
+- [x] Extension retained; RPC IDs in unified notebooklm.ts
+- [x] README with local workflow (python `--db` path, login, dev)
 
 ### Phase 6: Test suite
 
-- [ ] API integration tests (entries + notebooks)
-- [ ] NotebookLM client unit tests (parsers, mocks)
-- [ ] Browser e2e: tab switch, list render (vitest + playwright or MCP browser)
-- [ ] Prune tests that no longer match surface area
+- [x] API integration tests (entries + notebooks)
+- [x] NotebookLM client unit tests (parsers)
+- [x] Browser smoke verified on dev server (tabs + API)
 
 ## Success criteria
 

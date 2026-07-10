@@ -1,0 +1,35 @@
+import { sql } from 'drizzle-orm'
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+
+export const summaryEntries = sqliteTable('summary_entries', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  videoId: text('video_id').notNull().unique(),
+  title: text('title').notNull(),
+  url: text('url').notNull(),
+  status: text('status', { enum: ['pending', 'complete', 'error'] }).notNull(),
+  skipBackfill: integer('skip_backfill').notNull().default(0),
+  errorMessage: text('error_message'),
+  summaryText: text('summary_text'),
+  notebooklmUrl: text('notebooklm_url'),
+  lastViewed: text('last_viewed'),
+  pinned: integer('pinned').notNull().default(0),
+  tags: text('tags').notNull().default('[]'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedAt: text('deleted_at'),
+})
+
+export const notebooks = sqliteTable('notebooks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  notebooklmId: text('notebooklm_id').notNull().unique(),
+  title: text('title').notNull(),
+  url: text('url').notNull(),
+  lastViewed: text('last_viewed'),
+  pinned: integer('pinned').notNull().default(0),
+  tags: text('tags').notNull().default('[]'),
+  sourceCount: integer('source_count').notNull().default(0),
+  createdAt: text('created_at').default(sql`(current_timestamp)`).notNull(),
+})
+
+export type SummaryEntry = typeof summaryEntries.$inferSelect
+export type Notebook = typeof notebooks.$inferSelect
