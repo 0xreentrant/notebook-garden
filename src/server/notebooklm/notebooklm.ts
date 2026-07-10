@@ -259,8 +259,16 @@ export async function addYouTubeSourceViaApi(
   notebookId: string,
   url: string,
 ): Promise<void> {
-  const source = [null, null, null, null, null, null, null, [url]]
-  await rpcCall(cookie, RPC_ADD_SOURCES, [[source], notebookId], `/notebook/${notebookId}`)
+  await addYouTubeSourcesViaApi(cookie, notebookId, [url])
+}
+
+export async function addYouTubeSourcesViaApi(
+  cookie: string,
+  notebookId: string,
+  urls: string[],
+): Promise<void> {
+  const sources = urls.map((url) => [null, null, null, null, null, null, null, [url]])
+  await rpcCall(cookie, RPC_ADD_SOURCES, [sources, notebookId], `/notebook/${notebookId}`)
 }
 
 export type CreateAndImportResult = {
@@ -273,8 +281,16 @@ export async function createAndImportViaApi(
   title: string,
   url: string,
 ): Promise<CreateAndImportResult> {
+  return bulkCreateAndImportViaApi(cookie, title, [url])
+}
+
+export async function bulkCreateAndImportViaApi(
+  cookie: string,
+  title: string,
+  urls: string[],
+): Promise<CreateAndImportResult> {
   const notebookId = await createNotebookViaApi(cookie, title)
-  await addYouTubeSourceViaApi(cookie, notebookId, url)
+  await addYouTubeSourcesViaApi(cookie, notebookId, urls)
   return {
     notebookId,
     notebookUrl: `${NOTEBOOK_URL_PREFIX}${notebookId}`,

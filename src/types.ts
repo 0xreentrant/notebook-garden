@@ -1,3 +1,7 @@
+import type { NotebookLink } from './lib/notebook-links'
+
+export type { NotebookLink }
+
 export type SummaryEntryRow = {
   id: number
   video_id: string
@@ -8,6 +12,7 @@ export type SummaryEntryRow = {
   error_message: string | null
   summary_text: string | null
   notebooklm_url: string | null
+  notebooklm_links: NotebookLink[]
   last_viewed: string | null
   pinned: number
   tags: string[]
@@ -37,4 +42,20 @@ export type NotebookSyncPayload = {
   source_count?: number
 }
 
-export type AppView = 'summaries' | 'library'
+export type BookmarkRow = {
+  id: number
+  url: string
+  title: string
+  folder_path: string
+  chrome_profile: string
+  notebooklm_url: string | null
+  notebooklm_links: NotebookLink[]
+  last_viewed: string | null
+  pinned: number
+  tags: string[]
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export type AppView = 'summaries' | 'library' | 'bookmarks'

@@ -11,6 +11,7 @@ export const summaryEntries = sqliteTable('summary_entries', {
   errorMessage: text('error_message'),
   summaryText: text('summary_text'),
   notebooklmUrl: text('notebooklm_url'),
+  notebooklmLinks: text('notebooklm_links').notNull().default('[]'),
   lastViewed: text('last_viewed'),
   pinned: integer('pinned').notNull().default(0),
   tags: text('tags').notNull().default('[]'),
@@ -31,5 +32,22 @@ export const notebooks = sqliteTable('notebooks', {
   createdAt: text('created_at').default(sql`(current_timestamp)`).notNull(),
 })
 
+export const bookmarks = sqliteTable('bookmarks', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  url: text('url').notNull().unique(),
+  title: text('title').notNull(),
+  folderPath: text('folder_path').notNull().default(''),
+  chromeProfile: text('chrome_profile').notNull(),
+  notebooklmUrl: text('notebooklm_url'),
+  notebooklmLinks: text('notebooklm_links').notNull().default('[]'),
+  lastViewed: text('last_viewed'),
+  pinned: integer('pinned').notNull().default(0),
+  tags: text('tags').notNull().default('[]'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedAt: text('deleted_at'),
+})
+
 export type SummaryEntry = typeof summaryEntries.$inferSelect
 export type Notebook = typeof notebooks.$inferSelect
+export type Bookmark = typeof bookmarks.$inferSelect

@@ -6,8 +6,14 @@ import {
   patchEntry,
   softDeleteEntry,
 } from '../src/server/entries-api'
+import {
+  listBookmarks,
+  patchBookmark,
+  softDeleteBookmark,
+  syncBookmarksFromChrome,
+} from '../src/server/bookmarks-api'
 import { getDbPath, listCachedNotebooks, upsertNotebooks } from '../src/server/notebook-db'
-import { createNotebooklmImport } from '../src/server/notebooklm-routes'
+import { createNotebooklmImport, createNotebooklmBulkImport, addSourcesToNotebooklm } from '../src/server/notebooklm-routes'
 import {
   createNotebookViaApi,
   deleteNotebookViaApi,
@@ -102,6 +108,55 @@ export function createApp() {
     }
   })
 
+  app.get('/api/bookmarks', (c) => {
+    try {
+      return c.json(listBookmarks())
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.post('/api/bookmarks/sync', (c) => {
+    try {
+      return c.json(syncBookmarksFromChrome())
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.patch('/api/bookmarks/:id', async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    try {
+      const result = patchBookmark(id, body as Parameters<typeof patchBookmark>[1])
+      if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 404)
+      return c.json(result.row)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.delete('/api/bookmarks/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+
+    try {
+      const result = softDeleteBookmark(id)
+      if (!result.ok) return c.json({ error: result.error }, 404)
+      return c.body(null, 204)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
   app.post('/api/notebooklm/create-and-import', async (c) => {
     let body: { title?: unknown; url?: unknown }
     try {
@@ -121,6 +176,68 @@ export function createApp() {
       const result = await createNotebooklmImport(body.title.trim(), body.url.trim())
       if (result.error || !result.notebookUrl) {
         return c.json({ error: result.error ?? 'Failed to create notebook' }, 500)
+      }
+      return c.json(result)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.post('/api/notebooklm/bulk-create-and-import', async (c) => {
+    let body: { title?: unknown; urls?: unknown }
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    if (typeof body.title !== 'string' || !body.title.trim()) {
+      return c.json({ error: 'title is required' }, 400)
+    }
+    const urls = Array.isArray(body.urls)
+      ? body.urls
+          .filter((url): url is string => typeof url === 'string' && url.trim().startsWith('http'))
+          .map((url) => url.trim())
+      : []
+    if (urls.length === 0) {
+      return c.json({ error: 'urls must be a non-empty array of http URLs' }, 400)
+    }
+
+    try {
+      const result = await createNotebooklmBulkImport(body.title.trim(), urls)
+      if (result.error || !result.notebookUrl) {
+        return c.json({ error: result.error ?? 'Failed to create notebook' }, 500)
+      }
+      return c.json(result)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.post('/api/notebooklm/add-sources', async (c) => {
+    let body: { notebooklmId?: unknown; urls?: unknown }
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    if (typeof body.notebooklmId !== 'string' || !body.notebooklmId.trim()) {
+      return c.json({ error: 'notebooklmId is required' }, 400)
+    }
+    const urls = Array.isArray(body.urls)
+      ? body.urls
+          .filter((url): url is string => typeof url === 'string' && url.trim().startsWith('http'))
+          .map((url) => url.trim())
+      : []
+    if (urls.length === 0) {
+      return c.json({ error: 'urls must be a non-empty array of http URLs' }, 400)
+    }
+
+    try {
+      const result = await addSourcesToNotebooklm(body.notebooklmId.trim(), urls)
+      if (result.error || !result.notebookUrl) {
+        return c.json({ error: result.error ?? 'Failed to add sources' }, 500)
       }
       return c.json(result)
     } catch (error) {

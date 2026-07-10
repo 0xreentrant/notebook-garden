@@ -43,8 +43,8 @@ export function filterEntries(
   return entries.filter((entry) => {
     if (viewFilter === 'never_viewed' && entry.last_viewed != null) return false
     if (viewFilter === 'viewed' && entry.last_viewed == null) return false
-    if (notebookFilter === 'with_notebook' && !entry.notebooklm_url) return false
-    if (notebookFilter === 'without_notebook' && entry.notebooklm_url) return false
+    if (notebookFilter === 'with_notebook' && entry.notebooklm_links.length === 0) return false
+    if (notebookFilter === 'without_notebook' && entry.notebooklm_links.length > 0) return false
     if (tagFilter !== 'all' && !entry.tags.includes(tagFilter)) return false
     return true
   })

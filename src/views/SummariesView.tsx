@@ -21,9 +21,13 @@ import {
   XIcon,
 } from 'lucide-react'
 import {
+  addVideosToNotebook,
+  bulkCreateNotebookForVideos,
   createNotebookForVideo,
+  defaultBulkNotebookTitle,
   saveNotebookUrl,
 } from '@/notebooklm-importer'
+import { fetchNotebooks } from '@/api/notebooks'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -74,8 +78,12 @@ import {
   type ViewFilter,
 } from '@/lib/entry-list'
 import { collectAllTags, normalizeTag } from '@/lib/tags'
+import {
+  truncateNotebookTitle,
+} from '@/lib/notebook-links'
+import { sortNotebooks } from '@/lib/notebook-list'
 import { prepareSummaryMarkdown } from '@/summary-markdown'
-import type { SummaryEntryRow } from '@/types'
+import type { NotebookRow, SummaryEntryRow } from '@/types'
 
 const fieldClassName =
   'h-8 w-full rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
@@ -232,7 +240,7 @@ const EntryCard = memo(function EntryCard({
         setImportError(result.error ?? 'Failed to create notebook')
         return
       }
-      const updated = await saveNotebookUrl(entry.id, result.notebookUrl)
+      const updated = await saveNotebookUrl(entry.id, result.notebookUrl, entry.title)
       onNotebookCreated(updated)
       if (notebookTab) {
         notebookTab.location.href = result.notebookUrl
@@ -302,18 +310,20 @@ const EntryCard = memo(function EntryCard({
                 <ExternalLinkIcon className="size-3 shrink-0" />
                 <span className="truncate">{entry.url}</span>
               </a>
-              {entry.notebooklm_url ? (
+              {entry.notebooklm_links.map((link) => (
                 <a
-                  href={entry.notebooklm_url}
+                  key={link.url}
+                  href={link.url}
                   target="_blank"
                   rel="noreferrer"
                   className="flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground hover:text-foreground"
                   onClick={(event) => event.stopPropagation()}
+                  title={link.title}
                 >
                   <BookOpenIcon className="size-3 shrink-0" />
-                  <span className="truncate">NotebookLM</span>
+                  <span className="truncate">{truncateNotebookTitle(link.title)}</span>
                 </a>
-              ) : null}
+              ))}
               <div
                 className="flex flex-wrap items-center gap-1.5 pt-1"
                 onClick={(event) => event.stopPropagation()}
@@ -414,7 +424,7 @@ const EntryCard = memo(function EntryCard({
         <CollapsibleContent>
           <CardContent className="space-y-4 border-t pt-4">
             <div className="flex flex-wrap items-center gap-2">
-              {!entry.notebooklm_url ? (
+              {entry.notebooklm_links.length === 0 ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -619,6 +629,12 @@ export default function SummariesView() {
   const [bulkTagOpen, setBulkTagOpen] = useState(false)
   const [bulkTagDraft, setBulkTagDraft] = useState('')
   const [bulkTagPending, setBulkTagPending] = useState(false)
+  const [bulkNotebookExistingOpen, setBulkNotebookExistingOpen] = useState(false)
+  const [bulkNotebookPending, setBulkNotebookPending] = useState(false)
+  const [bulkNotebookError, setBulkNotebookError] = useState<string | null>(null)
+  const [bulkNotebookPickerId, setBulkNotebookPickerId] = useState<number | null>(null)
+  const [bulkNotebookOptions, setBulkNotebookOptions] = useState<NotebookRow[]>([])
+  const [bulkNotebookOptionsLoading, setBulkNotebookOptionsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [expandedIds, setExpandedIds] = useState<Set<number>>(() => new Set())
@@ -824,6 +840,98 @@ export default function SummariesView() {
     }
   }
 
+  async function linkEntriesToNotebook(
+    entries: SummaryEntryRow[],
+    notebookUrl: string,
+    title: string,
+  ) {
+    for (const entry of entries) {
+      const updated = await saveNotebookUrl(entry.id, notebookUrl, title)
+      replaceEntry(updated)
+    }
+  }
+
+  async function bulkInsertNewNotebook() {
+    const entries = selectedEntries()
+    if (entries.length === 0) return
+
+    setBulkNotebookPending(true)
+    setBulkNotebookError(null)
+    const notebookTab = window.open('about:blank', '_blank', 'noopener,noreferrer')
+    try {
+      const urls = entries.map((entry) => entry.url)
+      const title = defaultBulkNotebookTitle(entries)
+      const result = await bulkCreateNotebookForVideos(title, urls)
+      if (result.error || !result.notebookUrl) {
+        notebookTab?.close()
+        setBulkNotebookError(result.error ?? 'Failed to create notebook')
+        return
+      }
+      await linkEntriesToNotebook(entries, result.notebookUrl, title)
+      clearSelection()
+      if (notebookTab) {
+        notebookTab.location.href = result.notebookUrl
+      } else {
+        window.open(result.notebookUrl, '_blank', 'noopener,noreferrer')
+      }
+    } catch (bulkError) {
+      notebookTab?.close()
+      setBulkNotebookError(bulkError instanceof Error ? bulkError.message : String(bulkError))
+    } finally {
+      setBulkNotebookPending(false)
+    }
+  }
+
+  async function openBulkNotebookExistingModal() {
+    setBulkNotebookError(null)
+    setBulkNotebookPickerId(null)
+    setBulkNotebookExistingOpen(true)
+    setBulkNotebookOptionsLoading(true)
+    try {
+      const notebooks = await fetchNotebooks()
+      const sorted = sortNotebooks(notebooks, 'created_desc')
+      setBulkNotebookOptions(sorted)
+      if (sorted.length === 1) {
+        setBulkNotebookPickerId(sorted[0].id)
+      }
+    } catch (loadError) {
+      setBulkNotebookError(loadError instanceof Error ? loadError.message : String(loadError))
+      setBulkNotebookOptions([])
+    } finally {
+      setBulkNotebookOptionsLoading(false)
+    }
+  }
+
+  async function confirmBulkAddToExistingNotebook() {
+    const entries = selectedEntries()
+    const notebook = bulkNotebookOptions.find((row) => row.id === bulkNotebookPickerId)
+    if (entries.length === 0 || !notebook) return
+
+    setBulkNotebookPending(true)
+    setBulkNotebookError(null)
+    const notebookTab = window.open(notebook.url, '_blank', 'noopener,noreferrer')
+    try {
+      const result = await addVideosToNotebook(
+        notebook.notebooklm_id,
+        entries.map((entry) => entry.url),
+      )
+      if (result.error || !result.notebookUrl) {
+        notebookTab?.close()
+        setBulkNotebookError(result.error ?? 'Failed to add sources')
+        return
+      }
+      await linkEntriesToNotebook(entries, result.notebookUrl, notebook.title)
+      clearSelection()
+      setBulkNotebookExistingOpen(false)
+      setBulkNotebookPickerId(null)
+    } catch (bulkError) {
+      notebookTab?.close()
+      setBulkNotebookError(bulkError instanceof Error ? bulkError.message : String(bulkError))
+    } finally {
+      setBulkNotebookPending(false)
+    }
+  }
+
   function renderEntry(entry: SummaryEntryRow) {
     return (
       <EntryCard
@@ -964,6 +1072,24 @@ export default function SummariesView() {
               Tag
             </Button>
             <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkNotebookPending}
+              onClick={() => void bulkInsertNewNotebook()}
+            >
+              <BookOpenIcon className="size-3.5" />
+              Bulk insert to new notebook
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={bulkNotebookPending}
+              onClick={() => void openBulkNotebookExistingModal()}
+            >
+              <BookOpenIcon className="size-3.5" />
+              Bulk add to existing notebook
+            </Button>
+            <Button
               variant="destructive"
               size="sm"
               onClick={() => {
@@ -977,6 +1103,9 @@ export default function SummariesView() {
             <Button variant="ghost" size="sm" onClick={clearSelection}>
               Clear
             </Button>
+            {bulkNotebookError && !bulkNotebookExistingOpen ? (
+              <p className="w-full text-sm text-destructive">{bulkNotebookError}</p>
+            ) : null}
           </div>
         ) : null}
 
@@ -1036,6 +1165,76 @@ export default function SummariesView() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={bulkNotebookExistingOpen}
+          onOpenChange={(open) => {
+            setBulkNotebookExistingOpen(open)
+            if (!open) {
+              setBulkNotebookPickerId(null)
+              setBulkNotebookError(null)
+            }
+          }}
+        >
+          <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Add {selectedCount} videos to notebook</DialogTitle>
+              <DialogDescription>
+                Choose an existing NotebookLM notebook. Selected YouTube URLs are added as sources.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="flex max-h-72 flex-col gap-1 overflow-y-auto py-2">
+              {bulkNotebookOptionsLoading ? (
+                <p className="text-sm text-muted-foreground">Loading notebooks…</p>
+              ) : bulkNotebookOptions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No notebooks in the local cache. Sync from Library first.
+                </p>
+              ) : (
+                bulkNotebookOptions.map((notebook) => (
+                  <label
+                    key={notebook.id}
+                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60"
+                  >
+                    <input
+                      type="radio"
+                      name="bulk-notebook-target"
+                      checked={bulkNotebookPickerId === notebook.id}
+                      onChange={() => setBulkNotebookPickerId(notebook.id)}
+                      className={`${checkboxClassName} mt-1`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{notebook.title}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {notebook.source_count}{' '}
+                        {notebook.source_count === 1 ? 'source' : 'sources'}
+                      </span>
+                    </span>
+                  </label>
+                ))
+              )}
+            </div>
+            {bulkNotebookError ? (
+              <p className="text-sm text-destructive">{bulkNotebookError}</p>
+            ) : null}
+            <DialogFooter>
+              <DialogClose type="button" disabled={bulkNotebookPending}>
+                Cancel
+              </DialogClose>
+              <Button
+                type="button"
+                disabled={
+                  bulkNotebookPending ||
+                  bulkNotebookOptionsLoading ||
+                  bulkNotebookPickerId == null
+                }
+                onClick={() => void confirmBulkAddToExistingNotebook()}
+              >
+                {bulkNotebookPending ? 'Adding…' : 'Add to notebook'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

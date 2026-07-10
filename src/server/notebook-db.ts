@@ -44,30 +44,40 @@ function withDb<T>(fn: (db: ReturnType<typeof drizzle>) => T): T {
   }
 }
 
+function upsertNotebookItemInDb(db: ReturnType<typeof drizzle>, item: NotebookSyncPayload) {
+  const createdAt = item.created_at ?? new Date().toISOString()
+  db.insert(notebooks)
+    .values({
+      notebooklmId: item.notebooklmId,
+      title: item.title,
+      url: item.url,
+      createdAt,
+      lastViewed: item.last_viewed ?? null,
+      sourceCount: item.source_count ?? 0,
+    })
+    .onConflictDoUpdate({
+      target: notebooks.notebooklmId,
+      set: {
+        title: item.title,
+        url: item.url,
+        ...(item.created_at != null ? { createdAt: item.created_at } : {}),
+        lastViewed: item.last_viewed ?? null,
+        ...(item.source_count != null ? { sourceCount: item.source_count } : {}),
+      },
+    })
+    .run()
+}
+
+export function upsertNotebookItem(item: NotebookSyncPayload) {
+  withDb((db) => {
+    upsertNotebookItemInDb(db, item)
+  })
+}
+
 export function upsertNotebooks(items: NotebookSyncPayload[]) {
   withDb((db) => {
     for (const item of items) {
-      const createdAt = item.created_at ?? new Date().toISOString()
-      db.insert(notebooks)
-        .values({
-          notebooklmId: item.notebooklmId,
-          title: item.title,
-          url: item.url,
-          createdAt,
-          lastViewed: item.last_viewed ?? null,
-          sourceCount: item.source_count ?? 0,
-        })
-        .onConflictDoUpdate({
-          target: notebooks.notebooklmId,
-          set: {
-            title: item.title,
-            url: item.url,
-            ...(item.created_at != null ? { createdAt: item.created_at } : {}),
-            lastViewed: item.last_viewed ?? null,
-            ...(item.source_count != null ? { sourceCount: item.source_count } : {}),
-          },
-        })
-        .run()
+      upsertNotebookItemInDb(db, item)
     }
 
     const remoteIds = items.map((item) => item.notebooklmId)

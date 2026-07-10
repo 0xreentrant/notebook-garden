@@ -25,6 +25,7 @@ function seedDb() {
       error_message TEXT,
       summary_text TEXT,
       notebooklm_url TEXT,
+      notebooklm_links TEXT NOT NULL DEFAULT '[]',
       last_viewed TEXT,
       pinned INTEGER NOT NULL DEFAULT 0,
       tags TEXT NOT NULL DEFAULT '[]',

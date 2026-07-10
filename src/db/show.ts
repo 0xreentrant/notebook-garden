@@ -25,6 +25,7 @@ console.log('entries sample:', entries.slice(0, 3).map((row) => ({
   title: row.title,
   status: row.status,
   notebooklmUrl: row.notebooklmUrl,
+  notebooklmLinks: row.notebooklmLinks,
 })))
 
 console.log({ table: 'notebooks', count: library.length })

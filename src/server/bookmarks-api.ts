@@ -7,23 +7,21 @@ import {
   type NotebookLink,
 } from '../lib/notebook-links'
 import { parseTags, serializeTags } from '../lib/tags'
+import { collectChromeBookmarks } from './chrome-bookmarks'
+import { NOTEBOOKLM_URL_PREFIX } from './entries-api'
 
-export const NOTEBOOKLM_URL_PREFIX = 'https://notebooklm.google.com/notebook/'
-
-export const ENTRY_COLUMNS = `
-  id, video_id, title, url, status, skip_backfill,
-  error_message, summary_text, notebooklm_url, notebooklm_links, last_viewed, pinned, tags, created_at, updated_at, deleted_at
+export const BOOKMARK_COLUMNS = `
+  id, url, title, folder_path, chrome_profile,
+  notebooklm_url, notebooklm_links, last_viewed, pinned, tags,
+  created_at, updated_at, deleted_at
 `
 
-export type RawEntryRow = {
+export type RawBookmarkRow = {
   id: number
-  video_id: string
-  title: string
   url: string
-  status: string
-  skip_backfill: number
-  error_message: string | null
-  summary_text: string | null
+  title: string
+  folder_path: string
+  chrome_profile: string
   notebooklm_url: string | null
   notebooklm_links: string
   last_viewed: string | null
@@ -34,15 +32,13 @@ export type RawEntryRow = {
   deleted_at: string | null
 }
 
-export type EntryPatchPayload = {
+export type BookmarkPatchPayload = {
   notebooklm_url?: unknown
   notebooklm_link?: unknown
   last_viewed?: unknown
   pinned?: unknown
   tags?: unknown
 }
-
-export { getDbPath } from '../db/paths'
 
 function isNotebookLink(value: unknown): value is NotebookLink {
   return (
@@ -55,13 +51,12 @@ function isNotebookLink(value: unknown): value is NotebookLink {
   )
 }
 
-export function formatEntryRow(raw: RawEntryRow) {
+export function formatBookmarkRow(raw: RawBookmarkRow) {
   const notebooklm_links = parseNotebookLinks(raw.notebooklm_links)
   return {
     ...raw,
     tags: parseTags(raw.tags),
     notebooklm_links,
-    // ponytail: keep notebooklm_url as latest link for older readers; multi-link source of truth is notebooklm_links
     notebooklm_url: notebooklm_links.at(-1)?.url ?? raw.notebooklm_url,
   }
 }
@@ -70,22 +65,61 @@ function openDb(readonly = false) {
   return new Database(getDbPath(), { readonly, fileMustExist: true })
 }
 
-export function listEntries() {
+export function listBookmarks() {
   const db = openDb(true)
   try {
     const rows = db.prepare(`
-      SELECT ${ENTRY_COLUMNS}
-      FROM summary_entries
+      SELECT ${BOOKMARK_COLUMNS}
+      FROM bookmarks
       WHERE deleted_at IS NULL
       ORDER BY created_at DESC, id DESC
-    `).all() as RawEntryRow[]
-    return rows.map(formatEntryRow)
+    `).all() as RawBookmarkRow[]
+    return rows.map(formatBookmarkRow)
   } finally {
     db.close()
   }
 }
 
-export function patchEntry(id: number, payload: EntryPatchPayload) {
+export function syncBookmarksFromChrome(userDataDir?: string) {
+  const { bookmarks, profiles } = collectChromeBookmarks(userDataDir)
+  const db = openDb()
+  try {
+    const insert = db.prepare(`
+      INSERT OR IGNORE INTO bookmarks (
+        url, title, folder_path, chrome_profile,
+        notebooklm_links, pinned, tags, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, '[]', 0, '[]', ?, ?)
+    `)
+
+    const now = new Date().toISOString()
+    let inserted = 0
+    const run = db.transaction(() => {
+      for (const bookmark of bookmarks) {
+        const result = insert.run(
+          bookmark.url,
+          bookmark.title,
+          bookmark.folder_path,
+          bookmark.chrome_profile,
+          now,
+          now,
+        )
+        if (result.changes > 0) inserted += 1
+      }
+    })
+    run()
+
+    return {
+      inserted,
+      skipped: bookmarks.length - inserted,
+      profiles,
+      total_seen: bookmarks.length,
+    }
+  } finally {
+    db.close()
+  }
+}
+
+export function patchBookmark(id: number, payload: BookmarkPatchPayload) {
   const sets: string[] = []
   const values: unknown[] = []
 
@@ -151,11 +185,11 @@ export function patchEntry(id: number, payload: EntryPatchPayload) {
   try {
     if (linkToAppend) {
       const current = db.prepare(`
-        SELECT notebooklm_links FROM summary_entries
+        SELECT notebooklm_links FROM bookmarks
         WHERE id = ? AND deleted_at IS NULL
       `).get(id) as { notebooklm_links: string } | undefined
       if (!current) {
-        return { ok: false as const, status: 404, error: 'Entry not found' }
+        return { ok: false as const, status: 404, error: 'Bookmark not found' }
       }
       const nextLinks = appendNotebookLink(
         parseNotebookLinks(current.notebooklm_links),
@@ -170,39 +204,39 @@ export function patchEntry(id: number, payload: EntryPatchPayload) {
     }
 
     const result = db.prepare(`
-      UPDATE summary_entries
+      UPDATE bookmarks
       SET ${sets.join(', ')}
       WHERE id = ? AND deleted_at IS NULL
     `).run(...values, id)
 
     if (result.changes === 0) {
-      return { ok: false as const, status: 404, error: 'Entry not found' }
+      return { ok: false as const, status: 404, error: 'Bookmark not found' }
     }
 
     const row = db.prepare(`
-      SELECT ${ENTRY_COLUMNS}
-      FROM summary_entries
+      SELECT ${BOOKMARK_COLUMNS}
+      FROM bookmarks
       WHERE id = ?
-    `).get(id) as RawEntryRow | undefined
+    `).get(id) as RawBookmarkRow | undefined
 
-    return { ok: true as const, row: row ? formatEntryRow(row) : null }
+    return { ok: true as const, row: row ? formatBookmarkRow(row) : null }
   } finally {
     db.close()
   }
 }
 
-export function softDeleteEntry(id: number) {
+export function softDeleteBookmark(id: number) {
   const db = openDb()
   try {
     const now = new Date().toISOString()
     const result = db.prepare(`
-      UPDATE summary_entries
+      UPDATE bookmarks
       SET deleted_at = ?, updated_at = ?
       WHERE id = ? AND deleted_at IS NULL
     `).run(now, now, id)
 
     if (result.changes === 0) {
-      return { ok: false as const, status: 404, error: 'Entry not found' }
+      return { ok: false as const, status: 404, error: 'Bookmark not found' }
     }
 
     return { ok: true as const }
