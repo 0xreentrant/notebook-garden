@@ -21,7 +21,8 @@ export const NOTEBOOKLM_URL_PREFIX = 'https://notebooklm.google.com/notebook/'
 
 export const ENTRY_COLUMNS = `
   id, video_id, title, url, status, skip_backfill,
-  error_message, summary_text, notebooklm_url, notebooklm_links, last_viewed, pinned, tags, created_at, updated_at, deleted_at
+  error_message, summary_text, transcript_text, transcript_error,
+  notebooklm_url, notebooklm_links, last_viewed, pinned, tags, created_at, updated_at, deleted_at
 `
 
 export type RawEntryRow = {
@@ -33,6 +34,8 @@ export type RawEntryRow = {
   skip_backfill: number
   error_message: string | null
   summary_text: string | null
+  transcript_text: string | null
+  transcript_error: string | null
   notebooklm_url: string | null
   notebooklm_links: string
   last_viewed: string | null

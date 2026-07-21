@@ -11,6 +11,8 @@ export type SummaryEntryRow = {
   skip_backfill: number
   error_message: string | null
   summary_text: string | null
+  transcript_text: string | null
+  transcript_error: string | null
   notebooklm_url: string | null
   notebooklm_links: NotebookLink[]
   last_viewed: string | null
