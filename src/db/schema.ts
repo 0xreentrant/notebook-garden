@@ -40,6 +40,11 @@ export const bookmarks = sqliteTable('bookmarks', {
   title: text('title').notNull(),
   folderPath: text('folder_path').notNull().default(''),
   chromeProfile: text('chrome_profile').notNull(),
+  summaryText: text('summary_text'),
+  summaryStatus: text('summary_status', {
+    enum: ['pending', 'complete', 'error'],
+  }).notNull().default('pending'),
+  summaryError: text('summary_error'),
   notebooklmUrl: text('notebooklm_url'),
   notebooklmLinks: text('notebooklm_links').notNull().default('[]'),
   lastViewed: text('last_viewed'),

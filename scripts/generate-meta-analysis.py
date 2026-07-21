@@ -4,17 +4,21 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sqlite3
+import subprocess
 import sys
+import threading
 from pathlib import Path
+from typing import Any
 
 # Reuse cursor agent helper from watch-laterer when available
 WATCH_LATERER_SCRIPTS = Path.home() / "projects/dreams/watch-laterer/scripts"
 if WATCH_LATERER_SCRIPTS.is_dir():
     sys.path.insert(0, str(WATCH_LATERER_SCRIPTS))
 
-from follow_up_questions_lib import call_cursor_agent  # noqa: E402
+from follow_up_questions_lib import resolve_cursor_agent_command  # noqa: E402
 
 FOLLOW_UP_CUT = re.compile(
     r"(?ms)^[ \t]*#{2,3}[ \t]*Follow-up questions.*\Z|"
@@ -23,9 +27,13 @@ FOLLOW_UP_CUT = re.compile(
 )
 EXCERPT_CHARS = 320
 
-SYSTEM_PROMPT = """You are analyzing one person's YouTube Watch Later → Ask summaries corpus.
+SYSTEM_PROMPT = """You are analyzing one person's personal knowledge corpus, saved and studied across four sources:
+- YouTube Watch Later → Ask summaries (dated, with excerpts)
+- LinkedIn saved posts / articles (author + short summary where available)
+- Browser bookmarks (title + folder + tags, no body)
+- NotebookLM notebooks (title + tags + source count)
 
-This is a personal interest archaeology task, not a video catalog.
+This is a personal interest archaeology task, not a catalog.
 
 Write a clear markdown report covering:
 
@@ -37,8 +45,9 @@ Write a clear markdown report covering:
 6. **Tensions and contradictions** - competing pulls visible in the corpus
 
 Rules:
-- Ground claims in the corpus (cite a few example titles + dates when making a non-obvious claim)
-- Prefer patterns over listing every video
+- Ground claims in the corpus (cite a few example titles + dates, noting the source when useful, for non-obvious claims)
+- Treat all four sources as one person's signal; look for themes that cross sources
+- Prefer patterns over listing every item
 - Do not invent biography facts that are not implied by the material
 - No fluff openers; start with the substance
 - Output markdown only (no JSON wrapper, no code fences around the whole document)
@@ -49,36 +58,108 @@ def strip_follow_up(text: str) -> str:
     return FOLLOW_UP_CUT.sub("", text or "").strip()
 
 
+# ponytail: browser bookmarks can number in the thousands; cap to the most recent
+# BOOKMARK_LIMIT to keep the prompt bounded. Upgrade path: sample across the window.
+BOOKMARK_LIMIT = 600
+
+
+def _table_fingerprint(conn, table: str, where: str, date_col: str) -> str:
+    try:
+        row = conn.execute(
+            f"SELECT COUNT(*) AS n, COALESCE(MAX({date_col}), '') AS mx FROM {table} {where}"
+        ).fetchone()
+        return f"{row['n']}:{row['mx']}"
+    except sqlite3.OperationalError:
+        return "0:"
+
+
+def source_fingerprint(conn) -> str:
+    """Combined fingerprint across all corpus sources.
+
+    Must stay byte-identical to currentSourceFingerprint() in
+    src/server/meta-analysis-api.ts or the DB cache never hits.
+    """
+    s = _table_fingerprint(
+        conn, "summary_entries", "WHERE status = 'complete' AND deleted_at IS NULL", "updated_at"
+    )
+    b = _table_fingerprint(conn, "bookmarks", "WHERE deleted_at IS NULL", "updated_at")
+    li = _table_fingerprint(conn, "linkedin_saved_items", "WHERE deleted_at IS NULL", "updated_at")
+    nb = _table_fingerprint(conn, "notebooks", "", "created_at")
+    return f"s{s}|b{b}|l{li}|nb{nb}"
+
+
+def _safe_query(conn, sql: str) -> list:
+    try:
+        return conn.execute(sql).fetchall()
+    except sqlite3.OperationalError:
+        return []
+
+
+def _tags(raw: str | None) -> str:
+    try:
+        parsed = json.loads(raw or "[]")
+    except (TypeError, ValueError):
+        return ""
+    tags = [str(t).strip() for t in parsed if str(t).strip()]
+    return f" [{', '.join(tags)}]" if tags else ""
+
+
 def build_corpus(db_path: Path) -> tuple[str, str, int]:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    rows = conn.execute(
+
+    summaries = _safe_query(
+        conn,
         """
-        SELECT title, created_at, updated_at, summary_text
+        SELECT title, created_at, summary_text
         FROM summary_entries
         WHERE status = 'complete'
           AND deleted_at IS NULL
           AND summary_text IS NOT NULL
           AND length(trim(summary_text)) > 0
         ORDER BY created_at ASC, id ASC
+        """,
+    )
+    linkedin = _safe_query(
+        conn,
         """
-    ).fetchall()
-    fingerprint_row = conn.execute(
+        SELECT title, author_name, author_headline, summary_text, content_text, created_at
+        FROM linkedin_saved_items
+        WHERE deleted_at IS NULL
+        ORDER BY created_at ASC, id ASC
+        """,
+    )
+    bookmarks = _safe_query(
+        conn,
         """
-        SELECT COUNT(*) AS n, COALESCE(MAX(updated_at), '') AS mx
-        FROM summary_entries
-        WHERE status = 'complete' AND deleted_at IS NULL
+        SELECT title, url, folder_path, tags, created_at
+        FROM bookmarks
+        WHERE deleted_at IS NULL
+        ORDER BY created_at ASC, id ASC
+        """,
+    )[-BOOKMARK_LIMIT:]
+    notebooks = _safe_query(
+        conn,
         """
-    ).fetchone()
+        SELECT title, tags, source_count, created_at
+        FROM notebooks
+        ORDER BY created_at ASC, id ASC
+        """,
+    )
+
+    fingerprint = source_fingerprint(conn)
     conn.close()
 
-    fingerprint = f"{fingerprint_row['n']}:{fingerprint_row['mx']}"
+    total = len(summaries) + len(linkedin) + len(bookmarks) + len(notebooks)
     lines: list[str] = [
-        f"Corpus size: {len(rows)} complete summaries.",
+        f"Corpus size: {len(summaries)} YouTube summaries, {len(linkedin)} LinkedIn saves, "
+        f"{len(bookmarks)} bookmarks, {len(notebooks)} notebooks.",
+        "",
+        "## YouTube Watch Later summaries",
         "Each entry: date | title, then a short excerpt of the Ask summary.",
         "",
     ]
-    for row in rows:
+    for row in summaries:
         body = strip_follow_up(row["summary_text"] or "")
         excerpt = re.sub(r"\s+", " ", body)[:EXCERPT_CHARS].strip()
         date = (row["created_at"] or "")[:10]
@@ -86,7 +167,174 @@ def build_corpus(db_path: Path) -> tuple[str, str, int]:
         if excerpt:
             lines.append(excerpt)
         lines.append("")
-    return "\n".join(lines), fingerprint, len(rows)
+
+    lines += ["## LinkedIn saved posts / articles", ""]
+    for row in linkedin:
+        date = (row["created_at"] or "")[:10]
+        title = (row["title"] or "").strip() or "(untitled)"
+        author = (row["author_name"] or "").strip()
+        headline = (row["author_headline"] or "").strip()
+        who = f"{author} — {headline}" if author and headline else author
+        lines.append(f"### {date} | {title}" + (f" · {who}" if who else ""))
+        body = row["summary_text"] or row["content_text"] or ""
+        excerpt = re.sub(r"\s+", " ", body)[:EXCERPT_CHARS].strip()
+        if excerpt:
+            lines.append(excerpt)
+        lines.append("")
+
+    lines += ["## Browser bookmarks (title + folder + tags)", ""]
+    for row in bookmarks:
+        date = (row["created_at"] or "")[:10]
+        folder = (row["folder_path"] or "").strip()
+        suffix = f" — {folder}" if folder else ""
+        lines.append(f"- {date} | {row['title']}{suffix}{_tags(row['tags'])}")
+    lines.append("")
+
+    lines += ["## NotebookLM notebooks", ""]
+    for row in notebooks:
+        date = (row["created_at"] or "")[:10]
+        lines.append(
+            f"- {date} | {row['title']} ({row['source_count']} sources){_tags(row['tags'])}"
+        )
+    lines.append("")
+
+    return "\n".join(lines), fingerprint, total
+
+
+def emit_live(kind: str, **fields: Any) -> None:
+    print(f"LIVE\t{json.dumps({'kind': kind, **fields}, ensure_ascii=False)}", file=sys.stderr, flush=True)
+
+
+def assistant_delta_text(event: dict[str, Any]) -> str | None:
+    if event.get("type") != "assistant":
+        return None
+    if event.get("timestamp_ms") is None or event.get("model_call_id") is not None:
+        return None
+    message = event.get("message") or {}
+    parts = message.get("content") or []
+    chunks: list[str] = []
+    for part in parts:
+        if isinstance(part, dict) and part.get("type") == "text" and part.get("text"):
+            chunks.append(str(part["text"]))
+    text = "".join(chunks)
+    return text or None
+
+
+def tool_label(event: dict[str, Any]) -> str | None:
+    if event.get("type") != "tool_call" or event.get("subtype") != "started":
+        return None
+    tool_call = event.get("tool_call") or {}
+    if not isinstance(tool_call, dict):
+        return None
+    for key, payload in tool_call.items():
+        if not isinstance(payload, dict):
+            continue
+        name = key.removesuffix("ToolCall") if key.endswith("ToolCall") else key
+        args = payload.get("args") if isinstance(payload.get("args"), dict) else {}
+        if key == "function":
+            name = str(payload.get("name") or "function")
+            raw_args = payload.get("arguments")
+            detail = str(raw_args)[:80] if raw_args else ""
+            return f"{name} {detail}".strip()
+        if "path" in args:
+            return f"{name} {args['path']}"
+        if "command" in args:
+            return f"{name} {str(args['command'])[:80]}"
+        if args:
+            first = next(iter(args.values()), "")
+            return f"{name} {str(first)[:80]}".strip()
+        return name
+    return "tool"
+
+
+def call_cursor_agent_streaming(
+    *,
+    prompt: str,
+    model: str | None = None,
+    workspace: Path | None = None,
+    timeout: int | None = None,
+) -> str:
+    cmd = [
+        *resolve_cursor_agent_command(),
+        "--print",
+        "--trust",
+        "--mode",
+        "ask",
+        "--output-format",
+        "stream-json",
+        "--stream-partial-output",
+    ]
+    if model:
+        cmd.extend(["--model", model])
+    if workspace is not None:
+        cmd.extend(["--workspace", str(workspace)])
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+    except OSError as error:
+        raise SystemExit(f"cursor agent failed to start: {error}") from error
+
+    assert proc.stdin is not None
+    assert proc.stdout is not None
+    assert proc.stderr is not None
+    proc.stdin.write(prompt)
+    proc.stdin.close()
+
+    result_text: str | None = None
+    agent_stderr: list[str] = []
+
+    def read_stderr() -> None:
+        for line in proc.stderr:
+            agent_stderr.append(line.rstrip("\n"))
+
+    stderr_thread = threading.Thread(target=read_stderr, daemon=True)
+    stderr_thread.start()
+
+    try:
+        for line in proc.stdout:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(event, dict):
+                continue
+
+            delta = assistant_delta_text(event)
+            if delta is not None:
+                emit_live("delta", text=delta)
+
+            label = tool_label(event)
+            if label is not None:
+                emit_live("tool", label=label)
+
+            if event.get("type") == "result" and isinstance(event.get("result"), str):
+                result_text = event["result"]
+    finally:
+        try:
+            proc.wait(timeout=timeout if timeout and timeout > 0 else None)
+        except subprocess.TimeoutExpired as error:
+            proc.kill()
+            raise SystemExit(f"cursor agent timed out after {timeout}s") from error
+        stderr_thread.join(timeout=5)
+
+    err = "\n".join(agent_stderr).strip()
+    if proc.returncode != 0:
+        detail = err or f"exit code {proc.returncode}"
+        raise SystemExit(f"cursor agent failed: {detail}")
+    if "Authentication required" in err:
+        raise SystemExit("cursor agent is not authenticated. Run: cursor agent login")
+    if not result_text or not result_text.strip():
+        raise SystemExit("cursor agent returned empty output")
+    return result_text.strip()
 
 
 def main() -> int:
@@ -110,21 +358,21 @@ def main() -> int:
         print(fingerprint)
         return 0
     if n == 0:
-        print("No complete summaries to analyze.", file=sys.stderr)
+        print("No saved items to analyze.", file=sys.stderr)
         return 1
 
     prompt = (
-        f"{SYSTEM_PROMPT}\n\n---\n\n# Summary corpus\n\n{corpus}\n\n---\n\n"
+        f"{SYSTEM_PROMPT}\n\n---\n\n# Corpus\n\n{corpus}\n\n---\n\n"
         "Now write the meta-analysis markdown report."
     )
-    text = call_cursor_agent(
+    text = call_cursor_agent_streaming(
         prompt=prompt,
         model=args.model,
         workspace=args.db.resolve().parent,
         timeout=args.timeout or None,
     )
     # Fingerprint on stderr only after success so failed runs don't leak it as the UI error
-    print(fingerprint, file=sys.stderr)
+    print(fingerprint, file=sys.stderr, flush=True)
     print(text)
     return 0
 

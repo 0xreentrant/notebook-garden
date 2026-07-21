@@ -11,6 +11,8 @@ export type MetaAnalysisResponse = {
   analysis: MetaAnalysisRow | null
   generating: boolean
   lastError: string | null
+  liveDraft: string
+  liveTools: string[]
   started?: boolean
 }
 
