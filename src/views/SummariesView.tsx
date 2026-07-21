@@ -15,6 +15,7 @@ import {
   BookOpenIcon,
   ChevronDownIcon,
   ExternalLinkIcon,
+  MessageSquareIcon,
   PinIcon,
   TagPlusIcon,
   Trash2Icon,
@@ -109,6 +110,16 @@ const SummaryMarkdown = memo(function SummaryMarkdown({ body }: { body: string }
     </div>
   )
 })
+
+function cursorChatDeeplink(entry: SummaryEntryRow) {
+  const prompt = [
+    `I want to chat about a YouTube video summary stored in summaries.db (SQLite, workspace root).`,
+    `First fetch it: sqlite3 summaries.db "SELECT title, url, summary_text FROM summary_entries WHERE id = ${entry.id}"`,
+    `Entry: "${entry.title}" (id ${entry.id}).`,
+    `Read the summary_text, give me a brief recap of the key points, then answer my follow-up questions using the summary as context.`,
+  ].join('\n')
+  return `cursor://anysphere.cursor-deeplink/prompt?text=${encodeURIComponent(prompt)}`
+}
 
 function statusVariant(status: SummaryEntryRow['status']) {
   if (status === 'complete') return 'default' as const
@@ -435,6 +446,16 @@ const EntryCard = memo(function EntryCard({
                 >
                   <BookOpenIcon />
                   {importing ? 'Creating…' : 'NotebookLM'}
+                </Button>
+              ) : null}
+              {entry.status === 'complete' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  render={<a href={cursorChatDeeplink(entry)} />}
+                >
+                  <MessageSquareIcon />
+                  Chat in Cursor
                 </Button>
               ) : null}
               <AlertDialog>

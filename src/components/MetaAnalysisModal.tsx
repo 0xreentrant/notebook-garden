@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Loader2Icon, SparklesIcon } from 'lucide-react'
+import { Loader2Icon, MessageSquareIcon, SparklesIcon } from 'lucide-react'
 import {
   fetchMetaAnalysis,
   generateMetaAnalysis,
@@ -21,6 +21,15 @@ import {
 type Props = {
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+function cursorMetaAnalysisDeeplink(id: number) {
+  const prompt = [
+    `I want to chat about an interest meta-analysis stored in summaries.db (SQLite, workspace root).`,
+    `First fetch it: sqlite3 summaries.db "SELECT id, content, created_at FROM meta_analyses WHERE id = ${id}"`,
+    `Read the content, give me a brief recap of the current interests and how desires/needs evolved, then answer my follow-up questions using that analysis as context.`,
+  ].join('\n')
+  return `cursor://anysphere.cursor-deeplink/prompt?text=${encodeURIComponent(prompt)}`
 }
 
 export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
@@ -111,6 +120,16 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
 
         <DialogFooter className="mx-0 mb-0 shrink-0">
           <DialogClose>Close</DialogClose>
+          {analysis ? (
+            <Button
+              variant="outline"
+              size="sm"
+              render={<a href={cursorMetaAnalysisDeeplink(analysis.id)} />}
+            >
+              <MessageSquareIcon />
+              Chat in Cursor
+            </Button>
+          ) : null}
           {analysis && state?.cacheHit ? (
             <Button
               type="button"
