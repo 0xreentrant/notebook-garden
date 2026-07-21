@@ -97,7 +97,7 @@ def main() -> int:
         default=Path.home() / "projects/dreams/notebook-garden/summaries.db",
     )
     parser.add_argument("--model", default=None)
-    parser.add_argument("--timeout", type=int, default=600)
+    parser.add_argument("--timeout", type=int, default=0, help="Seconds; 0 = no timeout")
     parser.add_argument(
         "--fingerprint-only",
         action="store_true",
@@ -117,14 +117,14 @@ def main() -> int:
         f"{SYSTEM_PROMPT}\n\n---\n\n# Summary corpus\n\n{corpus}\n\n---\n\n"
         "Now write the meta-analysis markdown report."
     )
-    # Print fingerprint on stderr so stdout stays clean markdown for the server
-    print(fingerprint, file=sys.stderr)
     text = call_cursor_agent(
         prompt=prompt,
         model=args.model,
         workspace=args.db.resolve().parent,
-        timeout=args.timeout,
+        timeout=args.timeout or None,
     )
+    # Fingerprint on stderr only after success so failed runs don't leak it as the UI error
+    print(fingerprint, file=sys.stderr)
     print(text)
     return 0
 
