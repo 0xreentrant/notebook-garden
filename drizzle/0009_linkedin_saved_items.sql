@@ -1,0 +1,33 @@
+CREATE TABLE `linkedin_saved_items` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`linkedin_urn` text NOT NULL,
+	`item_type` text NOT NULL,
+	`linkedin_url` text NOT NULL,
+	`source_url` text,
+	`author_name` text,
+	`author_url` text,
+	`author_headline` text,
+	`title` text,
+	`content_text` text,
+	`raw_metadata` text DEFAULT '{}' NOT NULL,
+	`content_hash` text,
+	`extracted_at` text,
+	`capture_status` text NOT NULL,
+	`capture_error` text,
+	`enrichment_status` text DEFAULT 'pending' NOT NULL,
+	`enrichment_error` text,
+	`summary_text` text,
+	`enrichment_model` text,
+	`enrichment_prompt_version` text,
+	`enriched_at` text,
+	`notebooklm_url` text,
+	`notebooklm_links` text DEFAULT '[]' NOT NULL,
+	`last_viewed` text,
+	`pinned` integer DEFAULT 0 NOT NULL,
+	`tags` text DEFAULT '[]' NOT NULL,
+	`created_at` text NOT NULL,
+	`updated_at` text NOT NULL,
+	`deleted_at` text
+);
+--> statement-breakpoint
+CREATE UNIQUE INDEX `linkedin_saved_items_linkedin_urn_unique` ON `linkedin_saved_items` (`linkedin_urn`);

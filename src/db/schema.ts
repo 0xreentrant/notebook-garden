@@ -55,7 +55,44 @@ export const metaAnalyses = sqliteTable('meta_analyses', {
   createdAt: text('created_at').notNull(),
 })
 
+export const linkedinSavedItems = sqliteTable('linkedin_saved_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  linkedinUrn: text('linkedin_urn').notNull().unique(),
+  itemType: text('item_type', { enum: ['activity', 'article'] }).notNull(),
+  linkedinUrl: text('linkedin_url').notNull(),
+  sourceUrl: text('source_url'),
+  authorName: text('author_name'),
+  authorUrl: text('author_url'),
+  authorHeadline: text('author_headline'),
+  title: text('title'),
+  contentText: text('content_text'),
+  rawMetadata: text('raw_metadata').notNull().default('{}'),
+  contentHash: text('content_hash'),
+  extractedAt: text('extracted_at'),
+  captureStatus: text('capture_status', {
+    enum: ['pending', 'complete', 'metadata_only', 'error'],
+  }).notNull(),
+  captureError: text('capture_error'),
+  enrichmentStatus: text('enrichment_status', {
+    enum: ['pending', 'complete', 'error'],
+  }).notNull().default('pending'),
+  enrichmentError: text('enrichment_error'),
+  summaryText: text('summary_text'),
+  enrichmentModel: text('enrichment_model'),
+  enrichmentPromptVersion: text('enrichment_prompt_version'),
+  enrichedAt: text('enriched_at'),
+  notebooklmUrl: text('notebooklm_url'),
+  notebooklmLinks: text('notebooklm_links').notNull().default('[]'),
+  lastViewed: text('last_viewed'),
+  pinned: integer('pinned').notNull().default(0),
+  tags: text('tags').notNull().default('[]'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedAt: text('deleted_at'),
+})
+
 export type SummaryEntry = typeof summaryEntries.$inferSelect
 export type Notebook = typeof notebooks.$inferSelect
 export type Bookmark = typeof bookmarks.$inferSelect
 export type MetaAnalysis = typeof metaAnalyses.$inferSelect
+export type LinkedInSavedItem = typeof linkedinSavedItems.$inferSelect
