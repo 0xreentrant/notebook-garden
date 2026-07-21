@@ -14,6 +14,11 @@ import {
   syncBookmarksFromChrome,
 } from '../src/server/bookmarks-api'
 import {
+  listLinkedInSavedPage,
+  patchLinkedInSaved,
+  softDeleteLinkedInSaved,
+} from '../src/server/linkedin-saved-api'
+import {
   getDbPath,
   listCachedNotebooks,
   listCachedNotebooksPage,
@@ -185,6 +190,47 @@ export function createApp() {
 
     try {
       const result = softDeleteBookmark(id)
+      if (!result.ok) return c.json({ error: result.error }, 404)
+      return c.body(null, 204)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.get('/api/linkedin-saved', (c) => {
+    try {
+      return c.json(listLinkedInSavedPage(parseListPageQuery(new URL(c.req.url).searchParams)))
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.patch('/api/linkedin-saved/:id', async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    try {
+      const result = patchLinkedInSaved(id, body as Parameters<typeof patchLinkedInSaved>[1])
+      if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 404)
+      return c.json(result.row)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.delete('/api/linkedin-saved/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+
+    try {
+      const result = softDeleteLinkedInSaved(id)
       if (!result.ok) return c.json({ error: result.error }, 404)
       return c.body(null, 204)
     } catch (error) {

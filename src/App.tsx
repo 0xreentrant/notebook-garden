@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { BookmarkIcon, BookOpenIcon, SparklesIcon, SproutIcon } from 'lucide-react'
+import { BookmarkIcon, BookOpenIcon, LinkIcon, SparklesIcon, SproutIcon } from 'lucide-react'
 import MetaAnalysisModal from '@/components/MetaAnalysisModal'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AppView } from '@/types'
 import BookmarksView from '@/views/BookmarksView'
 import LibraryView from '@/views/LibraryView'
+import LinkedInSavedView from '@/views/LinkedInSavedView'
 import SummariesView from '@/views/SummariesView'
 
 const TABS: { id: AppView; label: string; description: string; icon: typeof SproutIcon }[] = [
@@ -20,6 +21,12 @@ const TABS: { id: AppView; label: string; description: string; icon: typeof Spro
     label: 'Bookmarks',
     description: 'Create notebooks from Chrome bookmarks',
     icon: BookmarkIcon,
+  },
+  {
+    id: 'linkedin',
+    label: 'LinkedIn Saved',
+    description: 'Browse captured LinkedIn Saved items',
+    icon: LinkIcon,
   },
   {
     id: 'library',
@@ -80,6 +87,8 @@ export default function App() {
           <SummariesView />
         ) : view === 'bookmarks' ? (
           <BookmarksView />
+        ) : view === 'linkedin' ? (
+          <LinkedInSavedView />
         ) : (
           <LibraryView />
         )}

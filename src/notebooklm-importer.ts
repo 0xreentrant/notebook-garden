@@ -73,6 +73,14 @@ export async function saveBookmarkNotebookUrl(
   return saveResourceNotebookUrl(`/api/bookmarks/${bookmarkId}`, notebookUrl, title)
 }
 
+export async function saveLinkedInNotebookUrl(
+  itemId: number,
+  notebookUrl: string,
+  title = 'NotebookLM',
+): Promise<import('./types').LinkedInSavedItemRow> {
+  return saveResourceNotebookUrl(`/api/linkedin-saved/${itemId}`, notebookUrl, title)
+}
+
 async function saveResourceNotebookUrl<T>(
   path: string,
   notebookUrl: string,
