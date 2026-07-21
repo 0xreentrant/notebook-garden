@@ -77,6 +77,7 @@ export function VirtualizedList({
 
   const virtualizer = useWindowVirtualizer({
     count: rows.length,
+    getItemKey: (index) => rows[index]?.key ?? index,
     estimateSize: (index) => {
       const row = rows[index]
       if (!row) return DEFAULT_ESTIMATE
