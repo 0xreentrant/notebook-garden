@@ -21,7 +21,17 @@ SAVED_URL = "https://www.linkedin.com/my-items/saved-posts/"
 
 
 def normalize_content(text: str | None) -> str:
-    return re.sub(r"\s+", " ", (text or "").strip())
+    """Keep paragraph/line breaks; tidy horizontal whitespace only."""
+    if not text:
+        return ""
+    # Normalize newlines, drop trailing "see more" chrome LinkedIn leaves in text
+    cleaned = text.replace("\r\n", "\n").replace("\r", "\n")
+    cleaned = re.sub(r"(?:…|\.\.\.)?\s*see more\s*$", "", cleaned, flags=re.I)
+    lines = [re.sub(r"[ \t\f\v]+", " ", line).strip() for line in cleaned.split("\n")]
+    # Drop empty lines at edges; collapse 3+ blank lines to one blank line
+    body = "\n".join(lines).strip()
+    body = re.sub(r"\n{3,}", "\n\n", body)
+    return body
 
 
 def content_hash(text: str | None) -> str | None:
@@ -119,9 +129,9 @@ def extract_card_fields(card) -> dict[str, Any]:
           const kind = urn.includes(':article:') ? 'article'
             : urn.includes(':activity:') ? 'activity' : 'unknown'
           const summary = el.querySelector(summarySel)
-          const summaryText = summary
-            ? summary.innerText.replace(/\\s+/g, ' ').trim()
-            : ''
+          // Prefer structured text so <br>/blocks keep line breaks (innerText already does).
+          // Do not collapse whitespace here - Python normalize_content preserves newlines.
+          const summaryText = summary ? (summary.innerText || '').trim() : ''
           const hasSeeMore = [...el.querySelectorAll('button, a')].some(
             n => /see more/i.test(n.innerText || '')
               || /see more/i.test(n.getAttribute('aria-label') || '')
@@ -144,6 +154,9 @@ def extract_card_fields(card) -> dict[str, Any]:
             : ''
           const text = (el.innerText || '').replace(/\\s+/g, ' ').trim()
           const savedLink = /\\bSaved link\\b/i.test(text)
+          const authorName = profiles[0]
+            ? profiles[0].text.split('\\n')[0].replace(/\\s+View\\b.*$/, '').trim()
+            : null
           return {
             urn,
             view,
@@ -151,7 +164,7 @@ def extract_card_fields(card) -> dict[str, Any]:
             summary_text: summaryText,
             has_see_more: hasSeeMore,
             update_url: update,
-            author_name: profiles[0]?.text?.split('View ')[0]?.trim() || null,
+            author_name: authorName,
             author_url: profiles[0]?.href || null,
             author_headline: null,
             actor_text: actorText,

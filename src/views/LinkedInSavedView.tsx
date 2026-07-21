@@ -154,7 +154,7 @@ const LinkedInCard = memo(function LinkedInCard({
           {item.author_name ? <span>{item.author_name}</span> : null}
         </div>
         {body ? (
-          <div className="whitespace-pre-wrap text-sm text-muted-foreground">
+          <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
             {open ? body : body.slice(0, 420)}
           </div>
         ) : (
