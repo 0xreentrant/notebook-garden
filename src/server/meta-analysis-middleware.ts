@@ -30,12 +30,7 @@ export function metaAnalysisMiddleware(
         // empty body is fine
       }
       try {
-        const result = generateMetaAnalysis({ force })
-        if (result.error) {
-          sendJson(res, 502, result)
-          return
-        }
-        sendJson(res, 200, result)
+        sendJson(res, 200, generateMetaAnalysis({ force }))
       } catch (error) {
         sendJson(res, 500, { error: String(error) })
       }

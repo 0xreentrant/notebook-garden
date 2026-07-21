@@ -32,11 +32,14 @@ function cursorMetaAnalysisDeeplink(id: number) {
   return `cursor://anysphere.cursor-deeplink/prompt?text=${encodeURIComponent(prompt)}`
 }
 
+const POLL_MS = 5000
+
 export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
   const [state, setState] = useState<MetaAnalysisResponse | null>(null)
   const [loading, setLoading] = useState(false)
-  const [generating, setGenerating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const generating = state?.generating ?? false
 
   useEffect(() => {
     if (!open) return
@@ -58,17 +61,22 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
     }
   }, [open])
 
+  useEffect(() => {
+    if (!open || !generating) return
+    const timer = setInterval(() => {
+      void fetchMetaAnalysis()
+        .then(setState)
+        .catch(() => {})
+    }, POLL_MS)
+    return () => clearInterval(timer)
+  }, [open, generating])
+
   async function runGenerate(force: boolean) {
-    setGenerating(true)
     setError(null)
     try {
-      const result = await generateMetaAnalysis(force)
-      setState(result)
-      if (result.error) setError(result.error)
+      setState(await generateMetaAnalysis(force))
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setGenerating(false)
     }
   }
 
@@ -94,13 +102,20 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
             </p>
           ) : null}
 
-          {error ? (
+          {error || (!generating && state?.lastError) ? (
             <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-              {error}
+              {error ?? state?.lastError}
             </p>
           ) : null}
 
-          {!loading && needsGenerate && !analysis ? (
+          {generating ? (
+            <p className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              <Loader2Icon className="size-4 animate-spin" />
+              Generating with cursor agent… This can take a while; safe to close or reload.
+            </p>
+          ) : null}
+
+          {!loading && !generating && needsGenerate && !analysis ? (
             <p className="text-sm text-muted-foreground">
               No cached analysis for the current summaries. Generate one with cursor agent
               (same path as follow-up Q&A). This can take several minutes.
@@ -111,7 +126,7 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
             <article className="prose prose-sm dark:prose-invert max-w-none">
               <p className="not-prose mb-3 text-xs text-muted-foreground">
                 Generated {new Date(analysis.createdAt).toLocaleString()}
-                {state?.cacheHit ? ' · cache hit' : ''}
+                {state?.cacheHit ? ' · cache hit' : ' · stale, summaries changed since'}
               </p>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{analysis.content}</ReactMarkdown>
             </article>
@@ -138,7 +153,7 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
               onClick={() => void runGenerate(true)}
             >
               {generating ? <Loader2Icon className="size-4 animate-spin" /> : null}
-              Regenerate
+              {generating ? 'Generating…' : 'Regenerate'}
             </Button>
           ) : (
             <Button

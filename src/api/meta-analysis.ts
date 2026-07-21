@@ -9,8 +9,9 @@ export type MetaAnalysisResponse = {
   currentFingerprint: string
   cacheHit: boolean
   analysis: MetaAnalysisRow | null
-  generated?: boolean
-  error?: string
+  generating: boolean
+  lastError: string | null
+  started?: boolean
 }
 
 export async function fetchMetaAnalysis(): Promise<MetaAnalysisResponse> {

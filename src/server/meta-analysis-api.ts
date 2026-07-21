@@ -1,13 +1,18 @@
-import { spawnSync } from 'node:child_process'
+import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { getDbPath } from './notebook-db'
 
-const SCRIPT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '../../scripts/generate-meta-analysis.py',
-)
+function scriptPath() {
+  return (
+    process.env.META_ANALYSIS_SCRIPT
+    ?? path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../../scripts/generate-meta-analysis.py',
+    )
+  )
+}
 
 export type MetaAnalysisRow = {
   id: number
@@ -20,7 +25,14 @@ export type MetaAnalysisGetResult = {
   currentFingerprint: string
   cacheHit: boolean
   analysis: MetaAnalysisRow | null
+  generating: boolean
+  lastError: string | null
 }
+
+// ponytail: in-memory job state, lost on dev-server restart (the python process
+// keeps running but its result is dropped). Upgrade path: persist job rows in the DB.
+let running: Promise<void> | null = null
+let lastError: string | null = null
 
 function openDb() {
   return new Database(getDbPath())
@@ -82,14 +94,21 @@ export function getLatestMetaAnalysis(): MetaAnalysisGetResult {
       | undefined
 
     if (!raw) {
-      return { currentFingerprint: fingerprint, cacheHit: false, analysis: null }
+      return {
+        currentFingerprint: fingerprint,
+        cacheHit: false,
+        analysis: null,
+        generating: running !== null,
+        lastError,
+      }
     }
     const analysis = mapRow(raw)
-    const cacheHit = analysis.sourceFingerprint === fingerprint
     return {
       currentFingerprint: fingerprint,
-      cacheHit,
-      analysis: cacheHit ? analysis : null,
+      cacheHit: analysis.sourceFingerprint === fingerprint,
+      analysis,
+      generating: running !== null,
+      lastError,
     }
   } finally {
     db.close()
@@ -119,54 +138,55 @@ export function insertMetaAnalysis(content: string, sourceFingerprint: string): 
   }
 }
 
+function runGenerator(): Promise<void> {
+  return new Promise((resolve) => {
+    // ponytail: no wall-clock timeout; a hung agent keeps `generating` true forever.
+    // Real errors (nonzero exit, empty output) resolve as soon as the process exits.
+    const child = spawn('python3', [scriptPath(), '--db', getDbPath()], { env: process.env })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => { stdout += chunk })
+    child.stderr.on('data', (chunk: string) => { stderr += chunk })
+    child.on('error', (error) => {
+      lastError = error.message
+      resolve()
+    })
+    child.on('close', (code) => {
+      if (code !== 0) {
+        lastError = (stderr || stdout || `exit ${code}`).trim().slice(0, 2000)
+        resolve()
+        return
+      }
+      const content = stdout.trim()
+      if (!content) {
+        lastError = 'Generator returned empty analysis'
+        resolve()
+        return
+      }
+      const fingerprintFromScript = stderr.trim().split('\n').filter(Boolean).at(-1)
+      insertMetaAnalysis(content, fingerprintFromScript || currentSourceFingerprint())
+      lastError = null
+      resolve()
+    })
+  })
+}
+
 export function generateMetaAnalysis(options?: {
   force?: boolean
-}): MetaAnalysisGetResult & { generated: boolean; error?: string } {
+}): MetaAnalysisGetResult & { started: boolean } {
   const existing = getLatestMetaAnalysis()
+  if (existing.generating) {
+    return { ...existing, started: false }
+  }
   if (existing.cacheHit && existing.analysis && !options?.force) {
-    return { ...existing, generated: false }
+    return { ...existing, started: false }
   }
 
-  const dbPath = getDbPath()
-  const result = spawnSync(
-    'python3',
-    [SCRIPT, '--db', dbPath],
-    {
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-      timeout: 650_000,
-      env: process.env,
-    },
-  )
-
-  if (result.error) {
-    return {
-      ...existing,
-      generated: false,
-      error: result.error.message,
-    }
-  }
-  if (result.status !== 0) {
-    const detail = (result.stderr || result.stdout || `exit ${result.status}`).trim()
-    return {
-      ...existing,
-      generated: false,
-      error: detail.slice(0, 2000),
-    }
-  }
-
-  const content = (result.stdout || '').trim()
-  const fingerprintFromScript = (result.stderr || '').trim().split('\n').filter(Boolean).at(-1)
-  const fingerprint = fingerprintFromScript || currentSourceFingerprint()
-  if (!content) {
-    return { ...existing, generated: false, error: 'Generator returned empty analysis' }
-  }
-
-  const analysis = insertMetaAnalysis(content, fingerprint)
-  return {
-    currentFingerprint: fingerprint,
-    cacheHit: true,
-    analysis,
-    generated: true,
-  }
+  lastError = null
+  running = runGenerator().finally(() => {
+    running = null
+  })
+  return { ...getLatestMetaAnalysis(), started: true }
 }

@@ -99,9 +99,7 @@ export function createApp() {
       // empty body ok
     }
     try {
-      const result = generateMetaAnalysis({ force })
-      if (result.error) return c.json(result, 502)
-      return c.json(result)
+      return c.json(generateMetaAnalysis({ force }))
     } catch (error) {
       return c.json({ error: String(error) }, 500)
     }
