@@ -21,6 +21,10 @@ import {
 } from '../src/server/notebook-db'
 import { createNotebooklmImport, createNotebooklmBulkImport, addSourcesToNotebooklm } from '../src/server/notebooklm-routes'
 import {
+  generateMetaAnalysis,
+  getLatestMetaAnalysis,
+} from '../src/server/meta-analysis-api'
+import {
   createNotebookViaApi,
   deleteNotebookViaApi,
   NOTEBOOKLM_DEFAULT_TITLE,
@@ -72,6 +76,31 @@ export function createApp() {
   const app = new Hono()
 
   app.get('/api/health', (c) => c.json({ ok: true }))
+
+  app.get('/api/meta-analysis', (c) => {
+    try {
+      return c.json(getLatestMetaAnalysis())
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.post('/api/meta-analysis', async (c) => {
+    let force = false
+    try {
+      const body = await c.req.json<{ force?: unknown }>()
+      force = body?.force === true
+    } catch {
+      // empty body ok
+    }
+    try {
+      const result = generateMetaAnalysis({ force })
+      if (result.error) return c.json(result, 502)
+      return c.json(result)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
 
   app.get('/api/entries', (c) => {
     try {

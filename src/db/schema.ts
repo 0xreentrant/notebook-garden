@@ -48,6 +48,14 @@ export const bookmarks = sqliteTable('bookmarks', {
   deletedAt: text('deleted_at'),
 })
 
+export const metaAnalyses = sqliteTable('meta_analyses', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  content: text('content').notNull(),
+  sourceFingerprint: text('source_fingerprint').notNull(),
+  createdAt: text('created_at').notNull(),
+})
+
 export type SummaryEntry = typeof summaryEntries.$inferSelect
 export type Notebook = typeof notebooks.$inferSelect
 export type Bookmark = typeof bookmarks.$inferSelect
+export type MetaAnalysis = typeof metaAnalyses.$inferSelect

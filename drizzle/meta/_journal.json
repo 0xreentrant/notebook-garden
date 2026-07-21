@@ -57,6 +57,13 @@
       "when": 1783300000000,
       "tag": "0007_bookmarks",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1783400000000,
+      "tag": "0008_meta_analyses",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import { entriesMiddleware } from './src/server/entries-middleware'
 import { bookmarksMiddleware } from './src/server/bookmarks-middleware'
 import { notebooklmMiddleware } from './src/server/notebooklm-routes'
 import { notebooksApiMiddleware } from './src/server/notebooks-api'
+import { metaAnalysisMiddleware } from './src/server/meta-analysis-middleware'
 
 function apiPlugin() {
   return {
@@ -15,12 +16,14 @@ function apiPlugin() {
       server.middlewares.use('/api/bookmarks', bookmarksMiddleware)
       server.middlewares.use('/api/notebooklm', notebooklmMiddleware)
       server.middlewares.use('/api/notebooks', notebooksApiMiddleware)
+      server.middlewares.use('/api/meta-analysis', metaAnalysisMiddleware)
     },
     configurePreviewServer(server: PreviewServer) {
       server.middlewares.use('/api/entries', entriesMiddleware)
       server.middlewares.use('/api/bookmarks', bookmarksMiddleware)
       server.middlewares.use('/api/notebooklm', notebooklmMiddleware)
       server.middlewares.use('/api/notebooks', notebooksApiMiddleware)
+      server.middlewares.use('/api/meta-analysis', metaAnalysisMiddleware)
     },
   }
 }
