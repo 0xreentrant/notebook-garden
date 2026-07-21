@@ -1,3 +1,6 @@
+import { spawn } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { getDbPath } from '../db/paths'
 import type { ListPage, ListPageQuery } from '../lib/list-page'
@@ -21,6 +24,7 @@ import {
 
 export const BOOKMARK_COLUMNS = `
   id, url, title, folder_path, chrome_profile,
+  summary_text, summary_status, summary_error,
   notebooklm_url, notebooklm_links, last_viewed, pinned, tags,
   created_at, updated_at, deleted_at
 `
@@ -31,6 +35,9 @@ export type RawBookmarkRow = {
   title: string
   folder_path: string
   chrome_profile: string
+  summary_text: string | null
+  summary_status: 'pending' | 'complete' | 'error'
+  summary_error: string | null
   notebooklm_url: string | null
   notebooklm_links: string
   last_viewed: string | null
@@ -133,6 +140,18 @@ export function listBookmarksPage(query: ListPageQuery): ListPage<ReturnType<typ
   }
 }
 
+function summarizeBookmarksInBackground(ids: number[]) {
+  const script = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../../scripts/generate-bookmark-summaries.py',
+  )
+  spawn(
+    'python3',
+    [script, '--db', getDbPath(), '--ids', ids.join(','), '--sleep', '5'],
+    { detached: true, stdio: 'ignore' },
+  ).unref()
+}
+
 export function syncBookmarksFromChrome(userDataDir?: string) {
   const { bookmarks, profiles } = collectChromeBookmarks(userDataDir)
   const db = openDb()
@@ -151,7 +170,7 @@ export function syncBookmarksFromChrome(userDataDir?: string) {
     `)
 
     const now = new Date().toISOString()
-    let inserted = 0
+    const insertedIds: number[] = []
     const run = db.transaction(() => {
       for (const bookmark of bookmarks) {
         const created = bookmark.date_added ?? now
@@ -163,7 +182,7 @@ export function syncBookmarksFromChrome(userDataDir?: string) {
           created,
           now,
         )
-        if (result.changes > 0) inserted += 1
+        if (result.changes > 0) insertedIds.push(Number(result.lastInsertRowid))
         else if (bookmark.date_added) {
           backdate.run(bookmark.date_added, bookmark.url, bookmark.date_added)
         }
@@ -171,9 +190,11 @@ export function syncBookmarksFromChrome(userDataDir?: string) {
     })
     run()
 
+    if (insertedIds.length > 0) summarizeBookmarksInBackground(insertedIds)
+
     return {
-      inserted,
-      skipped: bookmarks.length - inserted,
+      inserted: insertedIds.length,
+      skipped: bookmarks.length - insertedIds.length,
       profiles,
       total_seen: bookmarks.length,
     }

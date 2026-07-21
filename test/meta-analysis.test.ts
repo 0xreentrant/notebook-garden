@@ -6,6 +6,7 @@ import path from 'node:path'
 const TEST_DB = path.join(process.cwd(), 'test-meta-analysis.db')
 const OK_SCRIPT = path.join(process.cwd(), 'test-meta-ok.py')
 const FAIL_SCRIPT = path.join(process.cwd(), 'test-meta-fail.py')
+const LIVE_SCRIPT = path.join(process.cwd(), 'test-meta-live.py')
 
 process.env.APP_DB = TEST_DB
 
@@ -19,6 +20,17 @@ async function waitForIdle() {
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
   throw new Error('generator never finished')
+}
+
+async function waitForLive() {
+  for (let i = 0; i < 100; i++) {
+    const state = getLatestMetaAnalysis()
+    if (state.liveDraft.includes('Hello') && state.liveTools.includes('read README.md')) {
+      return state
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error('live stream never appeared')
 }
 
 beforeAll(() => {
@@ -56,11 +68,12 @@ beforeAll(() => {
   `).run()
   db.close()
 
-  // Fingerprint matches the seeded row: 1 complete entry, max(updated_at) = 2026-01-01
+  // Fingerprint matches the seeded row: 1 complete entry, max(updated_at) = 2026-01-01.
+  // Other source tables are absent, so they contribute the missing-table sentinel "0:".
   fs.writeFileSync(OK_SCRIPT, [
     'import sys, time',
     'time.sleep(0.3)',
-    'sys.stderr.write("1:2026-01-01\\n")',
+    'sys.stderr.write("s1:2026-01-01|b0:|l0:|nb0:\\n")',
     'print("# analysis body")',
   ].join('\n'))
   fs.writeFileSync(FAIL_SCRIPT, [
@@ -68,10 +81,24 @@ beforeAll(() => {
     'sys.stderr.write("boom\\n")',
     'sys.exit(1)',
   ].join('\n'))
+  fs.writeFileSync(LIVE_SCRIPT, [
+    'import sys, time, json',
+    'def live(payload):',
+    '  sys.stderr.write("LIVE\\t" + json.dumps(payload) + "\\n")',
+    '  sys.stderr.flush()',
+    'live({"kind":"tool","label":"read README.md"})',
+    'time.sleep(0.15)',
+    'live({"kind":"delta","text":"Hello"})',
+    'time.sleep(0.15)',
+    'live({"kind":"delta","text":" world"})',
+    'time.sleep(0.4)',
+    'sys.stderr.write("s1:2026-01-01|b0:|l0:|nb0:\\n")',
+    'print("# live analysis")',
+  ].join('\n'))
 })
 
 afterAll(() => {
-  for (const file of [TEST_DB, OK_SCRIPT, FAIL_SCRIPT]) {
+  for (const file of [TEST_DB, OK_SCRIPT, FAIL_SCRIPT, LIVE_SCRIPT]) {
     if (fs.existsSync(file)) fs.unlinkSync(file)
   }
 })
@@ -94,6 +121,8 @@ describe('meta-analysis background generation', () => {
     expect(done.lastError).toBeNull()
     expect(done.analysis?.content).toBe('# analysis body')
     expect(done.cacheHit).toBe(true)
+    expect(done.liveDraft).toBe('')
+    expect(done.liveTools).toEqual([])
 
     expect(generateMetaAnalysis().started).toBe(false)
   })
@@ -107,5 +136,22 @@ describe('meta-analysis background generation', () => {
     const after = getLatestMetaAnalysis()
     expect(after.lastError).toContain('boom')
     expect(after.analysis?.content).toBe('# analysis body')
+  })
+
+  it('exposes LIVE tool and delta events while generating, then clears them', async () => {
+    process.env.META_ANALYSIS_SCRIPT = LIVE_SCRIPT
+
+    expect(generateMetaAnalysis({ force: true }).started).toBe(true)
+    const mid = await waitForLive()
+    expect(mid.generating).toBe(true)
+    expect(mid.liveDraft).toContain('Hello')
+    expect(mid.liveTools).toContain('read README.md')
+
+    await waitForIdle()
+    const done = getLatestMetaAnalysis()
+    expect(done.analysis?.content).toBe('# live analysis')
+    expect(done.liveDraft).toBe('')
+    expect(done.liveTools).toEqual([])
+    expect(done.lastError).toBeNull()
   })
 })

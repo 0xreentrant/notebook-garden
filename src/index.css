@@ -34,9 +34,39 @@
   @apply font-semibold text-foreground;
 }
 
+.markdown-body h1,
+.markdown-body h2 {
+  @apply mt-5 mb-2 text-lg font-semibold text-foreground first:mt-0;
+}
+
 .markdown-body h3,
 .markdown-body h4 {
   @apply mt-4 mb-2 text-base font-semibold text-foreground first:mt-0;
+}
+
+.markdown-body table {
+  @apply my-3 w-full border-collapse text-left text-xs;
+}
+
+.markdown-body th,
+.markdown-body td {
+  @apply border border-border px-2 py-1 align-top;
+}
+
+.markdown-body th {
+  @apply bg-muted/50 font-semibold text-foreground;
+}
+
+.markdown-body code {
+  @apply rounded bg-muted px-1 py-0.5 text-xs;
+}
+
+.markdown-body blockquote {
+  @apply border-l-2 border-border pl-3 italic text-muted-foreground;
+}
+
+.markdown-body hr {
+  @apply my-4 border-border;
 }
 
 .markdown-body ul,

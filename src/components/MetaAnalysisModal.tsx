@@ -91,7 +91,8 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
             <DialogTitle>Interest meta-analysis</DialogTitle>
             <DialogDescription>
               Current interests and how desires/needs evolved across your Watch Later
-              summaries. Cached in the DB until summaries change.
+              summaries, LinkedIn saves, bookmarks, and notebooks. Cached in the DB until
+              any of those change.
             </DialogDescription>
           </DialogHeader>
 
@@ -109,10 +110,32 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
           ) : null}
 
           {generating ? (
-            <p className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-              <Loader2Icon className="size-4 animate-spin" />
-              Generating with cursor agent… This can take a while; safe to close or reload.
-            </p>
+            <div className="space-y-3">
+              <p className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                <Loader2Icon className="size-4 animate-spin" />
+                Generating with cursor agent… This can take a while; safe to close or reload.
+              </p>
+              {(state?.liveTools?.length ?? 0) > 0 ? (
+                <div className="rounded-md border border-border px-3 py-2">
+                  <p className="mb-1.5 text-xs font-medium text-muted-foreground">Tools</p>
+                  <ul className="max-h-28 space-y-1 overflow-y-auto font-mono text-xs text-muted-foreground">
+                    {[...(state?.liveTools ?? [])].reverse().map((label, index) => (
+                      <li key={`${label}-${index}`} className="truncate">
+                        {label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {state?.liveDraft ? (
+                <div className="rounded-md border border-border px-3 py-2">
+                  <p className="mb-1.5 text-xs font-medium text-muted-foreground">Live draft</p>
+                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap font-mono text-xs leading-relaxed text-foreground">
+                    {state.liveDraft}
+                  </pre>
+                </div>
+              ) : null}
+            </div>
           ) : null}
 
           {!loading && !generating && needsGenerate && !analysis ? (
@@ -123,8 +146,8 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
           ) : null}
 
           {analysis ? (
-            <article className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="not-prose mb-3 text-xs text-muted-foreground">
+            <article className="markdown-body">
+              <p className="mb-3 text-xs text-muted-foreground">
                 Generated {new Date(analysis.createdAt).toLocaleString()}
                 {state?.cacheHit ? ' · cache hit' : ' · stale, summaries changed since'}
               </p>
