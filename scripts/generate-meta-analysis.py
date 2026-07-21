@@ -96,7 +96,7 @@ def main() -> int:
         type=Path,
         default=Path.home() / "projects/dreams/notebook-garden/summaries.db",
     )
-    parser.add_argument("--model", default=None)
+    parser.add_argument("--model", default="auto")
     parser.add_argument("--timeout", type=int, default=0, help="Seconds; 0 = no timeout")
     parser.add_argument(
         "--fingerprint-only",
