@@ -109,7 +109,7 @@ export default function MetaAnalysisModal({ open, onOpenChange }: Props) {
           ) : null}
         </div>
 
-        <DialogFooter className="shrink-0">
+        <DialogFooter className="mx-0 mb-0 shrink-0">
           <DialogClose>Close</DialogClose>
           {analysis && state?.cacheHit ? (
             <Button
