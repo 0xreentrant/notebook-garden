@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import {
+  chromeTimeToIso,
   collectChromeBookmarks,
   parseChromeBookmarksFile,
 } from '../src/server/chrome-bookmarks.ts'
@@ -26,6 +27,7 @@ const sample = {
                   type: 'url',
                   name: 'MDN',
                   url: 'https://developer.mozilla.org/',
+                  date_added: '13189296370129836',
                 },
               ],
             },
@@ -61,12 +63,17 @@ assert.deepEqual(
     title: 'MDN',
     folder_path: 'Bookmarks bar/Dev/Tools',
     chrome_profile: 'Profile 1',
+    date_added: '2018-12-14T21:26:10.129Z',
   },
 )
 assert.equal(
   flat.find((row) => row.url === 'https://example.com/')?.folder_path,
   'Other bookmarks',
 )
+assert.equal(flat.find((row) => row.url === 'https://example.com/')?.date_added, null)
+assert.equal(chromeTimeToIso(undefined), null)
+assert.equal(chromeTimeToIso('0'), null)
+assert.equal(chromeTimeToIso('not a number'), null)
 
 const root = mkdtempSync(path.join(tmpdir(), 'chrome-bookmarks-check-'))
 try {

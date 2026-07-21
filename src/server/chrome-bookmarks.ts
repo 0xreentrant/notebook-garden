@@ -7,13 +7,26 @@ export type ChromeBookmarkFlat = {
   title: string
   folder_path: string
   chrome_profile: string
+  date_added: string | null
 }
 
 type ChromeNode = {
   type?: string
   name?: string
   url?: string
+  date_added?: string
   children?: ChromeNode[]
+}
+
+// Chrome stores date_added as WebKit time: microseconds since 1601-01-01 UTC
+const WEBKIT_TO_UNIX_MS = 11644473600000
+
+export function chromeTimeToIso(raw: string | undefined): string | null {
+  const us = Number(raw)
+  if (!Number.isFinite(us) || us <= 0) return null
+  const ms = us / 1000 - WEBKIT_TO_UNIX_MS
+  if (ms <= 0) return null
+  return new Date(ms).toISOString()
 }
 
 type ChromeBookmarksFile = {
@@ -79,6 +92,7 @@ function walkNode(
       title: typeof node.name === 'string' && node.name.trim() ? node.name : node.url,
       folder_path: folderPath,
       chrome_profile: profile,
+      date_added: chromeTimeToIso(node.date_added),
     })
     return
   }
