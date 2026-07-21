@@ -70,7 +70,7 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--force", action="store_true")
-    parser.add_argument("--model", default=os.environ.get("LI_ENRICH_MODEL"))
+    parser.add_argument("--model", default=os.environ.get("LI_ENRICH_MODEL") or "auto")
     parser.add_argument("--max-retries", type=int, default=3)
     parser.add_argument("--retry-backoff", type=float, default=5.0)
     args = parser.parse_args()
@@ -125,7 +125,7 @@ def main() -> int:
                     """,
                     (
                         text,
-                        args.model or "cursor-agent",
+                        args.model,
                         PROMPT_VERSION,
                         utc_now(),
                         utc_now(),
