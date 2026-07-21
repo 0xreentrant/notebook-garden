@@ -58,4 +58,36 @@ export type BookmarkRow = {
   deleted_at: string | null
 }
 
-export type AppView = 'summaries' | 'library' | 'bookmarks'
+export type LinkedInSavedItemRow = {
+  id: number
+  linkedin_urn: string
+  item_type: 'activity' | 'article'
+  linkedin_url: string
+  source_url: string | null
+  author_name: string | null
+  author_url: string | null
+  author_headline: string | null
+  title: string | null
+  content_text: string | null
+  raw_metadata: Record<string, unknown>
+  content_hash: string | null
+  extracted_at: string | null
+  capture_status: 'pending' | 'complete' | 'metadata_only' | 'error'
+  capture_error: string | null
+  enrichment_status: 'pending' | 'complete' | 'error'
+  enrichment_error: string | null
+  summary_text: string | null
+  enrichment_model: string | null
+  enrichment_prompt_version: string | null
+  enriched_at: string | null
+  notebooklm_url: string | null
+  notebooklm_links: NotebookLink[]
+  last_viewed: string | null
+  pinned: number
+  tags: string[]
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}
+
+export type AppView = 'summaries' | 'library' | 'bookmarks' | 'linkedin'
