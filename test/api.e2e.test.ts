@@ -24,6 +24,8 @@ function seedDb() {
       skip_backfill INTEGER NOT NULL DEFAULT 0,
       error_message TEXT,
       summary_text TEXT,
+      transcript_text TEXT,
+      transcript_error TEXT,
       notebooklm_url TEXT,
       notebooklm_links TEXT NOT NULL DEFAULT '[]',
       last_viewed TEXT,
@@ -60,13 +62,13 @@ function seedDb() {
       deleted_at TEXT
     );
     INSERT INTO summary_entries (
-      video_id, title, url, status, skip_backfill, summary_text, tags, created_at, updated_at
+      video_id, title, url, status, skip_backfill, summary_text, transcript_text, tags, created_at, updated_at
     ) VALUES
-      ('abc123', 'Test video', 'https://youtube.com/watch?v=abc123', 'complete', 0, 'Summary body', '["plant"]',
+      ('abc123', 'Test video', 'https://youtube.com/watch?v=abc123', 'complete', 0, 'Summary body', 'Full transcript here', '["plant"]',
        '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z'),
-      ('def456', 'Garden tips', 'https://youtube.com/watch?v=def456', 'complete', 0, 'More', '[]',
+      ('def456', 'Garden tips', 'https://youtube.com/watch?v=def456', 'complete', 0, 'More', NULL, '[]',
        '2026-01-02T00:00:00Z', '2026-01-02T00:00:00Z'),
-      ('ghi789', 'Soil science', 'https://youtube.com/watch?v=ghi789', 'complete', 0, 'Dirt', '["plant"]',
+      ('ghi789', 'Soil science', 'https://youtube.com/watch?v=ghi789', 'complete', 0, 'Dirt', NULL, '["plant"]',
        '2026-01-03T00:00:00Z', '2026-01-03T00:00:00Z');
     INSERT INTO notebooks (notebooklm_id, title, url, source_count, created_at)
     VALUES (
@@ -124,6 +126,8 @@ describe('notebook-garden API e2e', () => {
     expect(second.items).toHaveLength(1)
     expect(second.nextCursor).toBeNull()
     expect(second.items[0].video_id).toBe('abc123')
+    expect(second.items[0].transcript_text).toBe('Full transcript here')
+    expect(second.items[0].transcript_error).toBeNull()
   })
 
   it('filters entries by search and tag', async () => {

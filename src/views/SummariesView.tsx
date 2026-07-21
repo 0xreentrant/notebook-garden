@@ -15,6 +15,7 @@ import {
   BookOpenIcon,
   ChevronDownIcon,
   ExternalLinkIcon,
+  FileTextIcon,
   MessageSquareIcon,
   PinIcon,
   TagPlusIcon,
@@ -112,11 +113,14 @@ const SummaryMarkdown = memo(function SummaryMarkdown({ body }: { body: string }
 })
 
 function cursorChatDeeplink(entry: SummaryEntryRow) {
+  const hasTranscript = Boolean(entry.transcript_text?.trim())
   const prompt = [
     `I want to chat about a YouTube video summary stored in summaries.db (SQLite, workspace root).`,
-    `First fetch it: sqlite3 summaries.db "SELECT title, url, summary_text FROM summary_entries WHERE id = ${entry.id}"`,
+    `First fetch it: sqlite3 summaries.db "SELECT title, url, summary_text, transcript_text FROM summary_entries WHERE id = ${entry.id}"`,
     `Entry: "${entry.title}" (id ${entry.id}).`,
-    `Read the summary_text, give me a brief recap of the key points, then answer my follow-up questions using the summary as context.`,
+    hasTranscript
+      ? `A full transcript_text is available. Use the transcript as primary context for detailed questions; use summary_text as a brief recap/index of the key points, then answer my follow-up questions.`
+      : `No transcript_text is stored for this entry. Read the summary_text, give me a brief recap of the key points, then answer my follow-up questions using the summary as context.`,
   ].join('\n')
   return `cursor://anysphere.cursor-deeplink/prompt?text=${encodeURIComponent(prompt)}`
 }
@@ -157,6 +161,7 @@ const EntryCard = memo(function EntryCard({
   const [importError, setImportError] = useState<string | null>(null)
   const [tagDraft, setTagDraft] = useState('')
   const [tagInputOpen, setTagInputOpen] = useState(false)
+  const [transcriptOpen, setTranscriptOpen] = useState(false)
 
   const body = useMemo(() => {
     if (entry.status === 'error') {
@@ -458,6 +463,16 @@ const EntryCard = memo(function EntryCard({
                   Chat in Cursor
                 </Button>
               ) : null}
+              {entry.transcript_text?.trim() ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setTranscriptOpen(true)}
+                >
+                  <FileTextIcon />
+                  Transcript
+                </Button>
+              ) : null}
               <AlertDialog>
                 <AlertDialogTrigger
                   render={
@@ -508,6 +523,24 @@ const EntryCard = memo(function EntryCard({
           </CardContent>
         </CollapsibleContent>
       </Card>
+      <Dialog open={transcriptOpen} onOpenChange={setTranscriptOpen}>
+        <DialogContent className="flex max-h-[min(90vh,52rem)] max-w-2xl flex-col gap-0 overflow-hidden p-0">
+          <div className="space-y-4 overflow-y-auto p-4">
+            <DialogHeader>
+              <DialogTitle>Transcript</DialogTitle>
+              <DialogDescription>
+                English captions for &ldquo;{entry.title}&rdquo;.
+              </DialogDescription>
+            </DialogHeader>
+            <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">
+              {entry.transcript_text}
+            </pre>
+          </div>
+          <DialogFooter className="mx-0 mb-0 shrink-0">
+            <DialogClose>Close</DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Collapsible>
   )
 })

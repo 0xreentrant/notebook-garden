@@ -10,6 +10,8 @@ export const summaryEntries = sqliteTable('summary_entries', {
   skipBackfill: integer('skip_backfill').notNull().default(0),
   errorMessage: text('error_message'),
   summaryText: text('summary_text'),
+  transcriptText: text('transcript_text'),
+  transcriptError: text('transcript_error'),
   notebooklmUrl: text('notebooklm_url'),
   notebooklmLinks: text('notebooklm_links').notNull().default('[]'),
   lastViewed: text('last_viewed'),
