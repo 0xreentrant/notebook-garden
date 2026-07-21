@@ -143,20 +143,30 @@ export function syncBookmarksFromChrome(userDataDir?: string) {
         notebooklm_links, pinned, tags, created_at, updated_at
       ) VALUES (?, ?, ?, ?, '[]', 0, '[]', ?, ?)
     `)
+    // Chrome's date_added is the source of truth for created_at; this also
+    // repairs rows stamped with the import date by earlier syncs
+    const backdate = db.prepare(`
+      UPDATE bookmarks SET created_at = ?
+      WHERE url = ? AND created_at > ?
+    `)
 
     const now = new Date().toISOString()
     let inserted = 0
     const run = db.transaction(() => {
       for (const bookmark of bookmarks) {
+        const created = bookmark.date_added ?? now
         const result = insert.run(
           bookmark.url,
           bookmark.title,
           bookmark.folder_path,
           bookmark.chrome_profile,
-          now,
+          created,
           now,
         )
         if (result.changes > 0) inserted += 1
+        else if (bookmark.date_added) {
+          backdate.run(bookmark.date_added, bookmark.url, bookmark.date_added)
+        }
       }
     })
     run()
