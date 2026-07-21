@@ -27,31 +27,81 @@ export type MetaAnalysisGetResult = {
   analysis: MetaAnalysisRow | null
   generating: boolean
   lastError: string | null
+  liveDraft: string
+  liveTools: string[]
 }
 
 // ponytail: in-memory job state, lost on dev-server restart (the python process
 // keeps running but its result is dropped). Upgrade path: persist job rows in the DB.
 let running: Promise<void> | null = null
 let lastError: string | null = null
+let liveDraft = ''
+let liveTools: string[] = []
+
+const LIVE_DRAFT_MAX = 50_000
+const LIVE_TOOLS_MAX = 20
+
+function clearLive() {
+  liveDraft = ''
+  liveTools = []
+}
+
+function applyLiveLine(line: string) {
+  if (!line.startsWith('LIVE\t')) return false
+  try {
+    const payload = JSON.parse(line.slice(5)) as { kind?: string; text?: string; label?: string }
+    if (payload.kind === 'delta' && typeof payload.text === 'string') {
+      liveDraft += payload.text
+      if (liveDraft.length > LIVE_DRAFT_MAX) {
+        liveDraft = liveDraft.slice(-LIVE_DRAFT_MAX)
+      }
+    } else if (payload.kind === 'tool' && typeof payload.label === 'string' && payload.label) {
+      liveTools = [...liveTools, payload.label].slice(-LIVE_TOOLS_MAX)
+    }
+  } catch {
+    // ignore malformed LIVE lines
+  }
+  return true
+}
 
 function openDb() {
   return new Database(getDbPath())
 }
 
+function tableFingerprint(
+  conn: InstanceType<typeof Database>,
+  table: string,
+  where: string,
+  dateCol: string,
+): string {
+  try {
+    const row = conn
+      .prepare(
+        `SELECT COUNT(*) AS n, COALESCE(MAX(${dateCol}), '') AS mx FROM ${table} ${where}`,
+      )
+      .get() as { n: number; mx: string }
+    return `${row.n}:${row.mx}`
+  } catch {
+    return '0:'
+  }
+}
+
+// Must stay byte-identical to source_fingerprint() in scripts/generate-meta-analysis.py
+// or the DB cache never hits.
 export function currentSourceFingerprint(db?: InstanceType<typeof Database>): string {
   const owned = !db
   const conn = db ?? openDb()
   try {
-    const row = conn
-      .prepare(
-        `
-        SELECT COUNT(*) AS n, COALESCE(MAX(updated_at), '') AS mx
-        FROM summary_entries
-        WHERE status = 'complete' AND deleted_at IS NULL
-        `,
-      )
-      .get() as { n: number; mx: string }
-    return `${row.n}:${row.mx}`
+    const s = tableFingerprint(
+      conn,
+      'summary_entries',
+      "WHERE status = 'complete' AND deleted_at IS NULL",
+      'updated_at',
+    )
+    const b = tableFingerprint(conn, 'bookmarks', 'WHERE deleted_at IS NULL', 'updated_at')
+    const l = tableFingerprint(conn, 'linkedin_saved_items', 'WHERE deleted_at IS NULL', 'updated_at')
+    const nb = tableFingerprint(conn, 'notebooks', '', 'created_at')
+    return `s${s}|b${b}|l${l}|nb${nb}`
   } finally {
     if (owned) conn.close()
   }
@@ -100,6 +150,8 @@ export function getLatestMetaAnalysis(): MetaAnalysisGetResult {
         analysis: null,
         generating: running !== null,
         lastError,
+        liveDraft,
+        liveTools,
       }
     }
     const analysis = mapRow(raw)
@@ -109,6 +161,8 @@ export function getLatestMetaAnalysis(): MetaAnalysisGetResult {
       analysis,
       generating: running !== null,
       lastError,
+      liveDraft,
+      liveTools,
     }
   } finally {
     db.close()
@@ -144,30 +198,49 @@ function runGenerator(): Promise<void> {
     // Real errors (nonzero exit, empty output) resolve as soon as the process exits.
     const child = spawn('python3', [scriptPath(), '--db', getDbPath()], { env: process.env })
     let stdout = ''
-    let stderr = ''
+    const stderrLines: string[] = []
+    let stderrCarry = ''
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => { stdout += chunk })
-    child.stderr.on('data', (chunk: string) => { stderr += chunk })
+    child.stderr.on('data', (chunk: string) => {
+      const combined = stderrCarry + chunk
+      const parts = combined.split(/\r?\n/)
+      stderrCarry = parts.pop() ?? ''
+      for (const line of parts) {
+        if (!line) continue
+        if (applyLiveLine(line)) continue
+        stderrLines.push(line)
+      }
+    })
     child.on('error', (error) => {
       lastError = error.message
+      clearLive()
       resolve()
     })
     child.on('close', (code) => {
+      if (stderrCarry) {
+        if (!applyLiveLine(stderrCarry)) stderrLines.push(stderrCarry)
+        stderrCarry = ''
+      }
+      const stderr = stderrLines.join('\n').trim()
       if (code !== 0) {
         lastError = (stderr || stdout || `exit ${code}`).trim().slice(0, 2000)
+        clearLive()
         resolve()
         return
       }
       const content = stdout.trim()
       if (!content) {
         lastError = 'Generator returned empty analysis'
+        clearLive()
         resolve()
         return
       }
-      const fingerprintFromScript = stderr.trim().split('\n').filter(Boolean).at(-1)
+      const fingerprintFromScript = stderrLines.filter(Boolean).at(-1)
       insertMetaAnalysis(content, fingerprintFromScript || currentSourceFingerprint())
       lastError = null
+      clearLive()
       resolve()
     })
   })
@@ -185,6 +258,7 @@ export function generateMetaAnalysis(options?: {
   }
 
   lastError = null
+  clearLive()
   running = runGenerator().finally(() => {
     running = null
   })
