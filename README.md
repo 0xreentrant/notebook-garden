@@ -9,13 +9,13 @@ Unified local app for planting NotebookLM notebooks from YouTube summaries and t
 
 ## Database
 
-Single SQLite file: `summaries.db` (override with `APP_DB` or `WATCH_LATERER_DB`).
+Single SQLite file: `summaries.db` (override with `APP_DB`).
 
-Python Watch Later scripts in `../watch-laterer` are unchanged. Point them at this DB:
+Python Watch Later scripts live in `~/.cursor/skills/youtube-ask-summarize/scripts/`. Point them at this DB:
 
 ```bash
-cd ../watch-laterer
-python3 scripts/yt-headless-batch.py --db ../notebook-garden/summaries.db
+cd ~/.cursor/skills/youtube-ask-summarize
+python3 scripts/yt-headless-batch.py --db ~/projects/dreams/notebook-garden/summaries.db
 ```
 
 ## Setup

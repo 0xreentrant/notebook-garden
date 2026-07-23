@@ -13,12 +13,13 @@ import threading
 from pathlib import Path
 from typing import Any
 
-# Reuse cursor agent helper from watch-laterer when available
-WATCH_LATERER_SCRIPTS = Path.home() / "projects/dreams/watch-laterer/scripts"
-if WATCH_LATERER_SCRIPTS.is_dir():
-    sys.path.insert(0, str(WATCH_LATERER_SCRIPTS))
+YT_ASK_SCRIPTS = Path.home() / ".cursor/skills/youtube-ask-summarize/scripts"
+if not YT_ASK_SCRIPTS.is_dir():
+    raise SystemExit(f"Missing YouTube Ask scripts: {YT_ASK_SCRIPTS}")
+sys.path.insert(0, str(YT_ASK_SCRIPTS))
 
 from follow_up_questions_lib import resolve_cursor_agent_command  # noqa: E402
+from viewer_profile import VIEWER_PROFILE  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from obsidian_vault import with_workspace_switch  # noqa: E402
@@ -30,11 +31,13 @@ FOLLOW_UP_CUT = re.compile(
 )
 EXCERPT_CHARS = 320
 
-SYSTEM_PROMPT = """You are analyzing one person's personal knowledge corpus, saved and studied across four sources:
-- YouTube Watch Later → Ask summaries (dated, with excerpts - be aware that all QA questions are AI-generated from my personal context)
+SYSTEM_PROMPT = f"""You are analyzing one person's personal knowledge corpus, saved and studied across four sources:
+- YouTube Watch Later → Ask summaries (dated, with excerpts - QA questions are AI-generated from the viewer profile below)
 - LinkedIn saved posts / articles (author + short summary or captured text where available)
 - Browser bookmarks (title + folder + tags; many include a generated page summary excerpt - treat those as primary evidence, titles alone as weaker signal)
 - NotebookLM notebooks (title + tags + source count)
+
+{VIEWER_PROFILE}
 
 This is a personal interest archaeology task, not a catalog.
 
