@@ -154,4 +154,23 @@ describe('meta-analysis background generation', () => {
     expect(done.liveTools).toEqual([])
     expect(done.lastError).toBeNull()
   })
+
+  it('marks cache stale when sources change and regenerates on request', async () => {
+    process.env.META_ANALYSIS_SCRIPT = OK_SCRIPT
+    expect(getLatestMetaAnalysis().cacheHit).toBe(true)
+
+    const db = new Database(TEST_DB)
+    db.prepare(`
+      INSERT INTO summary_entries (video_id, title, url, status, summary_text, created_at, updated_at)
+      VALUES ('v2', 'T2', 'u2', 'complete', 'S2', '2026-02-01', '2026-02-01')
+    `).run()
+    db.close()
+
+    expect(getLatestMetaAnalysis().cacheHit).toBe(false)
+
+    // Fingerprint in the script is fixed to the original seed; force still regenerates.
+    expect(generateMetaAnalysis({ force: true }).started).toBe(true)
+    await waitForIdle()
+    expect(getLatestMetaAnalysis().analysis?.content).toBe('# analysis body')
+  })
 })
