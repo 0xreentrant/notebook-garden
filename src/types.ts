@@ -94,5 +94,3 @@ export type LinkedInSavedItemRow = {
   updated_at: string
   deleted_at: string | null
 }
-
-export type AppView = 'summaries' | 'library' | 'bookmarks' | 'linkedin'
