@@ -1,6 +1,6 @@
 import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
+import { reactRouter } from '@react-router/dev/vite'
 import { defineConfig, loadEnv, type PreviewServer, type ViteDevServer } from 'vite'
 import { entriesMiddleware } from './src/server/entries-middleware'
 import { bookmarksMiddleware } from './src/server/bookmarks-middleware'
@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => {
   if (env.NOTEBOOKLM_COOKIE) process.env.NOTEBOOKLM_COOKIE = env.NOTEBOOKLM_COOKIE
 
   return {
-    plugins: [react(), tailwindcss(), apiPlugin()],
+    plugins: [reactRouter(), tailwindcss(), apiPlugin()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),
