@@ -8,6 +8,8 @@ local.db
 .env
 node_modules/
 dist/
+build/
+.react-router/
 .drizzle/
 *.local
 __pycache__/
