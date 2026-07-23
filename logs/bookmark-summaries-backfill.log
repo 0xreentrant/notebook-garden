@@ -2180,3 +2180,16 @@ Moved Temporarily
 - [2652] https://ethglobal.com/talks/talk-mev-and-ethereum-ft6io
 - [1751] https://selfhacked.com/blog/myelin/
 - [3700] https://mindsets-of-auditing.netlify.app/
+  error: Command '['cursor', 'agent', '--print', '--trust', '--mode', 'ask', '--model', 'auto', 'Summarize this bookmarked web page for a personal knowledge base.\n\nReturn markdown only with:\n1) A short title line as `# …`\n2) A concise summary (3-8 bullets or short paragraphs) of what the page covers and why it might have been worth bookmarking\n\nBookmark title: Mindsets of Auditing\nURL: https://mindsets-of-auditing.netlify.app/\nBookmark folder: Mobile bookmarks\n\nPage content (extracted text, may be truncated):\nMindsets of Auditing\n']' timed out after 300 seconds
+- [2465] https://www.cidrdb.org/cidr2023/papers/p27-lim.pdf
+  error: non-text content-type: application/pdf
+- [4889] https://www.totaltypescript.com/typescript-5-2-new-keyword-using
+- [3112] https://blog.bytes032.xyz/p/how-to-break-into-web3-while-working-full-time-job
+  error: HTTP Error 402: Payment Required
+- [4453] https://www.tarot.to/
+- [3093] https://genflow.com/blogs/how-the-twitter-algorithm-works-in-2023
+  error: HTTP Error 404: Not Found
+- [4737] https://fs.blog/deliberate-practice-guide/
+- [4385] https://null-byte.wonderhowto.com/how-to/steganography-hide-secret-data-inside-image-audio-file-seconds-0180936/
+- [5132] https://commoncog.com/tacit-knowledge-is-a-real-thing/
+- [5110] https://www.truity.com/blog/why-do-infjs-hate-feeling-vulnerable
