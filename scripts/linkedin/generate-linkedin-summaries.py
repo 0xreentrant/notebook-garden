@@ -21,12 +21,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from posts_db import connect, utc_now
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from obsidian_vault import with_workspace_switch  # noqa: E402
+
 DEFAULT_DB = Path(__file__).resolve().parents[2] / "summaries.db"
 PROMPT_VERSION = "li-summary-v1"
 
 
-def build_prompt(row: dict) -> str:
-    return f"""Summarize this LinkedIn saved item for a personal knowledge base.
+def build_prompt(row: dict, db: Path | None = None) -> str:
+    return with_workspace_switch(
+        f"""Summarize this LinkedIn saved item for a personal knowledge base.
 
 Return markdown only with:
 1) A short title line as `# …`
@@ -43,7 +47,9 @@ URL: {row.get('source_url') or row.get('linkedin_url')}
 
 Content:
 {row.get('content_text') or ''}
-"""
+""",
+        db,
+    )
 
 
 def run_cursor_agent(prompt: str, model: str | None) -> str:
@@ -100,7 +106,7 @@ def main() -> int:
     failed = 0
     for row in rows:
         print(f"- {row['linkedin_urn']}", file=sys.stderr)
-        prompt = build_prompt(row)
+        prompt = build_prompt(row, args.db)
         if args.dry_run:
             print(prompt[:500])
             ok += 1

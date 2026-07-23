@@ -81,11 +81,10 @@ import {
   type SortKey,
   type ViewFilter,
 } from '@/lib/entry-list'
-import { normalizeTag } from '@/lib/tags'
-import {
-  truncateNotebookTitle,
-} from '@/lib/notebook-links'
+import { truncateNotebookTitle } from '@/lib/notebook-links'
 import { searchNotebooks, sortNotebooks } from '@/lib/notebook-list'
+import { withWorkspaceSwitch } from '@/lib/settings'
+import { normalizeTag } from '@/lib/tags'
 import { prepareSummaryMarkdown } from '@/summary-markdown'
 import type { NotebookRow, SummaryEntryRow } from '@/types'
 
@@ -114,14 +113,14 @@ const SummaryMarkdown = memo(function SummaryMarkdown({ body }: { body: string }
 
 function cursorChatDeeplink(entry: SummaryEntryRow) {
   const hasTranscript = Boolean(entry.transcript_text?.trim())
-  const prompt = [
+  const prompt = withWorkspaceSwitch([
     `I want to chat about a YouTube video summary stored in summaries.db (SQLite, workspace root).`,
     `First fetch it: sqlite3 summaries.db "SELECT title, url, summary_text, transcript_text FROM summary_entries WHERE id = ${entry.id}"`,
     `Entry: "${entry.title}" (id ${entry.id}).`,
     hasTranscript
       ? `A full transcript_text is available. Use the transcript as primary context for detailed questions; use summary_text as a brief recap/index of the key points, then answer my follow-up questions.`
       : `No transcript_text is stored for this entry. Read the summary_text, give me a brief recap of the key points, then answer my follow-up questions using the summary as context.`,
-  ].join('\n')
+  ])
   return `cursor://anysphere.cursor-deeplink/prompt?text=${encodeURIComponent(prompt)}`
 }
 

@@ -11,3 +11,4 @@ dist/
 .drizzle/
 *.local
 __pycache__/
+notebook-garden-settings.json
