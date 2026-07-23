@@ -2085,3 +2085,98 @@ Moved Temporarily
 - [2486] https://medium.com/@jason.carver/defend-against-wild-magic-in-the-next-ethereum-upgrade-b008247839d2
 - [4682] https://0age.medium.com/the-promise-and-the-peril-of-metamorphic-contracts-9eb8b8413c5e
 - [3808] https://0xvolodya.hashnode.dev/nft-attacks
+- [3790] https://neptunemutual.com/blog/
+- [4928] https://github.com/Uniswap/governance-seatbelt
+- [2266] https://lemire.me/blog/2021/11/11/checking-simple-equations-or-inequalities-with-z3/
+- [2105] https://nymag.com/strategist/amp/article/best-skin-care-routine-for-40s.html
+- [5226] https://news.ycombinator.com/item?id=36848680
+- [4312] https://ethereum.stackexchange.com/questions/131455/understanding-dynamic-types-in-calldata
+- [2681] https://blog.oxor.io/exploring-the-bugs-and-features-of-solidity-compiler-versions-a-guide-for-smart-contract-fe04e852ea64
+- [2799] https://ventral.digital/posts/2022/4/28/fuzzing-for-memory-bugs-in-solidity
+- [4570] https://anytype.io/?hn
+- [3327] https://github.com/IdreesInc/Waypoint
+- [1893] https://www.jefftk.com/p/accidentally-load-bearing
+- [4904] https://mirror.xyz/unboxblock.eth
+- [4273] https://officercia.mirror.xyz/KwP9oK2RGnzgvdD8EIo6SwrrkFYhCWFCFBMn8NZ0LeU
+- [4854] https://docs.google.com/document/d/1-_0Wlwch_vtkPM4F-SdEXLjQYaYT7KoPlU2rjt7tkLQ/edit
+  error: Command '['cursor', 'agent', '--print', '--trust', '--mode', 'ask', '--model', 'auto', "Summarize this bookmarked web page for a personal knowledge base.\n\nReturn markdown only with:\n1) A short title line as `# …`\n2) A concise summary (3-8 bullets or short paragraphs) of what the page covers and why it might have been worth bookmarking\n\nBookmark title: Trail of Bits Minimum Viable Plans (MVPs) for Security - Google Docs\nURL: https://docs.google.com/document/d/1-_0Wlwch_vtkPM4F-SdEXLjQYaYT7KoPlU2rjt7tkLQ/edit\nBookmark folder: Mobile bookmarks\n\nPage content (extracted text, may be truncated):\nDan's right answers for cybersecurity - Google Docs This browser version is no longer supported. Please upgrade to a supported browser. Dan's right answers for cybersecurity Tab Share Sign in File Edit View Insert Format Tools Extensions Help Accessibility Debug Unsaved changes to Drive Image options Replace image Table options Accessibility\n"]' timed out after 300 seconds
+- [3778] https://blog.li.fi/navigating-arbitrary-messaging-bridges-a-comparison-framework-8720f302e2aa
+- [3434] https://venturehacks.com/pricing
+- [2433] https://github.com/dabeaz-course/python-mastery
+- [2565] https://blog.decurity.io/dx-protocol-vulnerability-disclosure-bddff88aeb1d?gi=e99fa22ed361
+- [5239] https://github.com/zoni/obsidian-export
+- [1683] https://www.lazyvim.org/
+- [5043] https://github.com/wez/wezterm
+- [3496] https://news.ycombinator.com/item?id=36712793
+  error: HTTP Error 429: Too Many Requests
+- [4927] https://medium.com/@med456789d/uniswap-v3-math-insights-part-1-of-6-f85e1597b411
+- [3611] https://a16zcrypto.com/posts/article/lvr-quantifying-the-cost-of-providing-liquidity-to-automated-market-makers/
+- [3610] https://ethresear.ch/t/lvr-minimization-in-uniswap-v4/15900
+- [3530] https://rust-unofficial.github.io/too-many-lists/first-layout.html
+- [3409] https://www.lesswrong.com/s/ZNNi2uNx9E6iwGKKG
+- [3829] https://www.nushell.sh/
+- [1917] https://github.com/akavel/up
+- [2422] https://cwe.mitre.org/top25/archive/2023/2023_top25_list.html
+- [1803] https://www.trust-security.xyz/post/case-for-the-defense
+  error: HTTP Error 404: Not Found
+- [2190] https://blog.bytes032.xyz/p/building-a-brand-as-a-solo-auditor-101
+  error: HTTP Error 402: Payment Required
+- [3852] https://jbecker.dev/research/on-writing-performant-rust
+- [1761] https://www.trygloo.com/blog/classify-text-llms-learnings
+  error: page produced no text
+- [5053] https://www.mironov.com/owe/
+- [3469] https://github.com/JoranHonig/awesome-web3-ai-security
+- [4085] https://github.com/RareSkills/huff-puzzles
+- [2868] https://github.com/karanpratapsingh/system-design
+- [3158] https://psyche.co/guides/how-to-cultivate-shoshin-or-a-beginners-mind
+- [2883] https://github.com/ronami/meta-typing
+- [2844] https://mikkel.ca/blog/git-is-my-buddy-effective-solo-developer/
+- [3285] https://docs.huff.sh/
+- [2293] https://medium.com/code4rena/code4rena-and-solo-audits-a-perfect-combination-8dbd97b232a0
+- [2840] https://nuclearsquid.com/writings/git-add/
+- [2463] https://www.dataorienteddesign.com/dodbook/dodmain.html
+- [5174] https://lopespm.com/notes/2023/07/02/writing-as-a-form-of-thinking.html
+- [3723] https://software.rajivprab.com/2023/07/01/moneyball-for-software-teams/
+  error: Command '['cursor', 'agent', '--print', '--trust', '--mode', 'ask', '--model', 'auto', 'Summarize this bookmarked web page for a personal knowledge base.\n\nReturn markdown only with:\n1) A short title line as `# …`\n2) A concise summary (3-8 bullets or short paragraphs) of what the page covers and why it might have been worth bookmarking\n\nBookmark title: Moneyball for Software Teams – An Imperfect Heuristic for Quantifying Dev Performance – Software the Hard way\nURL: https://software.rajivprab.com/2023/07/01/moneyball-for-software-teams/\nBookmark folder: Mobile bookmarks\n\nPage content (extracted text, may be truncated):\nMoneyball for Software Teams – An Imperfect Heuristic for Quantifying Dev Performance – Software the Hard way Skip to content Software the Hard way Thoughts on Software Development Moneyball for Software Teams – An Imperfect Heuristic for Quantifying Dev Performance RP Uncategorized 2023-07-01 2025-04-27 26 Minutes Someone on Reddit once asked for “unethical career advice” for software developers. Here’s the most highly rated answer with over two thousand people liking it : Make a good first impression and you’re set for a while. Something takes longer? They’re a good developer so I guess we under pointed that. It is actually insane to me how bad of an employee I was at some points in my career and not only didn’t get fired but got good reviews. Meanwhile employees who actually did more than me for those months, but had a bad reputation were getting bad reviews. And a highly rated follow-up comment from another developer : it used to seem insane to me too until i kicked ass at a job that i still got fired from; then i learned that it’s mostly about whether or not they like you and MUCH less about your skills or experience than i had previously thought. And lest you think this is just malcontent developers at mediocre companies, here’s a Facebook manager describing their experience : During the reviews process, managers compete against their peer managers to secure strong grades for their direct reports. Managers are compelled to vouch fiercely for their favorite employees, but don’t speak up for employees they don’t like or who have previously received poor ratings. “There’s a saying at Facebook that once you have one bad half, you’re destined for bad halves the rest of your time there. That stigma will follow you,” said a manager who left in September. Something echoed by other managers from other companies as well : A backend engineer spent three months carefully migrating a critical system from MongoDb to PostgreSQL. During calibration, a engineering director summarized it as: “They moved data from one database to another. Isn’t that mostly automated these days?” The complexity of the migration – which prevented a potential business-halting disaster – was completely lost in translation. The engineer who eliminates persistent on-call issues might save the company millions in prevented outages, but their manager gets 30 seconds to explain why this matters. Meanwhile, someone who built a flashy dashboard that executives see daily gets minutes of discussion and universal praise. Let’s also be honest, your rating partially depends on how well your manager plays the game. A manager skilled at storytelling can transform “fixed some bugs” into “systematically eliminated critical customer experience issues through deep technical analysis and innovative solutions.” Two engineers with identical performance but different managers could walk away with completely different ratings. It’s like two equally skilled engineers walk into calibration: one gets a TED Talk intro, the other’s stuck whispering their story around the water cooler. And this isn’t just a problem that affects the occasional unlucky developer – the heuristics companies currently use to evaluate performance is significantly harmful to the business and customers as well. Here’s the former lead of Google Docs talking about how Google’s performance-review-process made it so hard for them to build vital features that users really needed : we had a lot of small bugs and usability issues, often in areas where we weren’t at parity with Excel. Users wanted us to implement … pretty standard spreadsheet fare, and very reasonable requests. … However it was a constant struggle to prioritize these types of issues vs. “bigger impact” projects. Our engineers cared about the product and wanted to polish it. But they also wanted to be promoted. And so we would deprioritize product polish for projects that looked better to a promotion committee A ton of maladaptive symptoms in the corporate environment, such as the ones voiced above, can be traced back to one root cause – not having good ways of quantifying engineering performance. To be sure, quantifying anything is always an error-prone endeavor. And you’re bound to have a million people sagely warning you about the dangers of Goodhart’s Law – “when a measure becomes a target, it ceases to be a good measure” . But every time I hear a warning about Goodhart’s Law, I’m reminded of everything people say above. And all the other downsides of assessing performance on the basis of subjective feelings. Such as: Top performers not being appropriately rewarded or recognized for the excellent work they’re doing Significant pay disparities on the basis of gender, race, or personal-connections Unproductive meetings with too many attendees Chasing new fads instead of sticking to tried and true solutions Over-engineering in order to get promoted or pad one’s resume Toxic managers and team leads that hamstring their team Poor testing, CI/CD, code-review practices If we had better ways of quantifying team performance, most of those symptoms would be rapidly addressed. Managers would immediately put a stop to poorly run meetings if they were presented with hard data demonstrating the negative impact on the team’s performance. No one would be underpaid because of “lacking charisma” or having the wrong skin color if their performance could be justified in a compelling and quantifiable manner. A sufficiently good metric, even if imperfect, would produce better results than the dystopia we are currently living in. Hence why quantifying performance was a priority for us at the startup I had founded some time ago. As someone who has worked at a number of companies, including two FANGs, I had seen first-hand what worked well and what didn’t. As the founder of our startup, I had the freedom to try out my own ideas. Despite its present ubiquity, sabermetrics was once considered to be a radical idea. Mainstream consensus held that you couldn’t rely on cold impersonal numbers to evaluate a player’s baseball performance. That attempting to do so would only result in the dreaded Goodhart’s Law. It took decades before sabermetrics was polished and found mainstream acceptance – exploding in popularity with Billy Beane’s success with the Oakland As ( popularized by the book and movie Moneyball ). We believed that we could do something similar in the field of software. Our methods certainly aren’t perfect and their flaws are obvious. Despite this, we found it to be a net positive and more useful than the alternative – gauging performance on the basis of subjective feelings. I’m always open to discussing ways of further improving our heuristics. This is a summary of how we quantified engineering performance. The Boring Stuff Let me preface this by saying that many of the building blocks of what we did aren’t radically new. Most people have probably encountered these approaches in their own companies. I’m repeating it here only to provide context for the other things we did that are more unusual. Every task that someone works on, is tracked as a “story” in our tracking tool (eg, Asana) Each story is assigned to a single owner, and given a fixed number of points Velocity can then be quantified at both the individual and team level, by calculating at the end of each week the number of points that were completed in that week Because the above methods are so widespread, we’ll avoid spending too much time talking about them here. If you’re looking for more information regarding the above, I recommend reading other articles such as an introduction to agile/scrum/kanban etc. Pay Attention to Velocity One very curious observation that always struck me in my previous teams – even though we were spending so many man-hours on velocity tracking as described above, the output went entirely into a black hole. Never to be seen again or have any impact. It’s almost as though they listened to an Agile™ coach te\n']' timed out after 300 seconds
+- [3265] https://a16zcrypto.com/zero-knowledge-canon/
+- [3776] https://yonom.substack.com/p/native-json-output-from-gpt-4
+- [2931] https://www.cpushack.com/CPU/cpu.html
+- [5058] https://news.ycombinator.com/item?id=34173006
+  error: HTTP Error 429: Too Many Requests
+- [3889] https://noxx.substack.com/p/order-flows-kingmaker-of-the-block?utm_source=profile&utm_medium=reader2
+- [5150] https://q3k.org/wInd3x.html
+- [2629] https://www.simplypsychology.org/erik-erikson.html#initiative
+- [4850] https://taeric.github.io/trading-with-bdds.html
+- [2658] https://tmewett.com/c-tips/#general-resources
+- [4932] https://medium.com/@alexanazodo/unravelling-mev-navigating-cryptos-value-extraction-challenges-38c9850bdd4d
+- [3481] https://www.coindesk.com/layer2/2022/02/02/just-in-time-liquidity-how-mev-can-enhance-defi-on-ethereum/
+  error: HTTP Error 308: Permanent Redirect
+- [1831] https://www.paradigm.xyz/2021/10/a-guide-to-designing-effective-nft-launches
+  error: HTTP Error 308: Permanent Redirect
+- [4551] https://www.entrepreneur.com/growing-a-business/the-damaging-results-of-the-mandated-return-to-office-is/454043
+- [2880] https://github.com/pcaversaccio/raw-tx/tree/main
+- [3120] https://medium.com/immunefi/how-to-calculate-funds-at-risk-c09e6af86594
+- [3401] https://silentcicero.gitbooks.io/pro-tips-for-ethereum-wallet-management/content/
+  error: HTTP Error 401: Unauthorized
+- [4350] https://degatchi.com/articles/speedrunning-bug-hunting#what-is-speedrunning
+- [5235] https://www.zkcamp.xyz/blog/information-theory
+  error: HTTP Error 402: Payment Required
+- [4926] https://medium.com/taipei-ethereum-meetup/uniswap-v3-features-explained-in-depth-178cfe45f223
+- [2398] https://github.com/crytic/blockchain-security-contacts
+- [3191] https://www.simplyrecipes.com/recipes/chicken_freezer_burritos/
+  error: HTTP Error 403: Forbidden
+- [4420] https://github.com/joethei/obsidian-plantuml/issues/6
+- [3882] https://www.washingtonpost.com/opinions/2023/06/26/maya-shankar-juilliard-commencement-address/
+- [3542] https://www.react-graph-gallery.com/
+- [3902] https://mixbytes.io/blog/overview-of-the-inflation-attack
+- [2787] https://consensys.github.io/smart-contract-best-practices/attacks/frontrunning/
+  error: HTTP Error 404: Not Found
+- [4414] https://github.com/SunWeb3Sec/DeFiVulnLabs
+- [4330] https://blog.bytes032.xyz/p/solo-auditor-s-guide-quoting-right-and-keeping-it-tight
+  error: HTTP Error 402: Payment Required
+- [4281] https://blog.openzeppelin.com/workshop-recap-secure-development-workshop-1
+- [3696] https://www.thebarbell.com/mike-mentzer-workout/#
+- [2383] https://l2fees.info/blog/rollup-calldata-compression
+- [2652] https://ethglobal.com/talks/talk-mev-and-ethereum-ft6io
+- [1751] https://selfhacked.com/blog/myelin/
+- [3700] https://mindsets-of-auditing.netlify.app/

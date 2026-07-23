@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "watch-laterer NotebookLM",
+  "name": "notebook-garden NotebookLM",
   "version": "0.1.0",
-  "description": "Creates a NotebookLM notebook per video when called by watch-laterer",
+  "description": "Creates a NotebookLM notebook per video when called by notebook-garden",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAthf/3+3oqniGuIGvGQsQ2P3Gt4HK4/lZAm9dDHC2cvig06sF77qEwvNzYkEqoqeHkEMKfD2QPP2cruydpX2ZTu2MdgKLD8JNCri0KWleLq20Oxar3FyIltKpwNLSsuGgljdLmikvf7krmLc1xG4obWGXGXMB43JweDarHDaSxLFbGBH34+1gNOkFV3+LIXTk2B3VFucS6ulYgjhnwJLvMslbkjnSj8LLed2cDsEP8tJSNMoI3Ic+4SG4FgmL8sX92LaJnwBw8LmlZPlYB54a/51zo1ssm1SV4PUBC1vAiGE9dTyC/zEKMNKJhdLr5EeCQeiFX98oNbWR9IBFwU8UEwIDAQAB",
   "background": {
     "service_worker": "background.js"
