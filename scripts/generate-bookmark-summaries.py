@@ -31,6 +31,9 @@ CONTENT_CHARS = 8000
 FETCH_TIMEOUT = 20
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) notebook-garden-bookmark-summarizer"
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from obsidian_vault import with_workspace_switch  # noqa: E402
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -86,8 +89,9 @@ def fetch_page_text(url: str) -> str:
     return text[:CONTENT_CHARS]
 
 
-def build_prompt(row: dict, content: str) -> str:
-    return f"""Summarize this bookmarked web page for a personal knowledge base.
+def build_prompt(row: dict, content: str, db: Path | None = None) -> str:
+    return with_workspace_switch(
+        f"""Summarize this bookmarked web page for a personal knowledge base.
 
 Return markdown only with:
 1) A short title line as `# …`
@@ -99,7 +103,9 @@ Bookmark folder: {row.get('folder_path') or '(none)'}
 
 Page content (extracted text, may be truncated):
 {content}
-"""
+""",
+        db,
+    )
 
 
 def run_cursor_agent(prompt: str, model: str) -> str:
@@ -228,7 +234,7 @@ def main() -> int:
         print(f"- [{row['id']}] {row['url']}", file=sys.stderr)
         try:
             content = fetch_page_text(row["url"])
-            prompt = build_prompt(row, content)
+            prompt = build_prompt(row, content, args.db)
             if args.dry_run:
                 print(prompt[:500])
                 ok += 1

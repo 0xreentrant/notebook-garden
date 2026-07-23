@@ -81,6 +81,24 @@ function openDb(readonly = false) {
   return new Database(getDbPath(), { readonly, fileMustExist: true })
 }
 
+export function countPendingBookmarkSummaries() {
+  const db = openDb(true)
+  try {
+    return (
+      db
+        .prepare(
+          `
+        SELECT COUNT(*) AS n FROM bookmarks
+        WHERE deleted_at IS NULL AND summary_status = 'pending'
+      `,
+        )
+        .get() as { n: number }
+    ).n
+  } finally {
+    db.close()
+  }
+}
+
 export function listBookmarks() {
   const db = openDb(true)
   try {

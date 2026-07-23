@@ -98,7 +98,23 @@ export function currentSourceFingerprint(db?: InstanceType<typeof Database>): st
       "WHERE status = 'complete' AND deleted_at IS NULL",
       'updated_at',
     )
-    const b = tableFingerprint(conn, 'bookmarks', 'WHERE deleted_at IS NULL', 'updated_at')
+    let b = '0::0'
+    try {
+      const brow = conn
+        .prepare(
+          `
+          SELECT COUNT(*) AS n,
+                 COALESCE(MAX(updated_at), '') AS mx,
+                 SUM(CASE WHEN summary_status = 'complete' THEN 1 ELSE 0 END) AS sc
+          FROM bookmarks
+          WHERE deleted_at IS NULL
+          `,
+        )
+        .get() as { n: number; mx: string; sc: number | null }
+      b = `${brow.n}:${brow.mx}:${brow.sc ?? 0}`
+    } catch {
+      // missing bookmarks table (or pre-migration schema) in tests
+    }
     const l = tableFingerprint(conn, 'linkedin_saved_items', 'WHERE deleted_at IS NULL', 'updated_at')
     const nb = tableFingerprint(conn, 'notebooks', '', 'created_at')
     return `s${s}|b${b}|l${l}|nb${nb}`

@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { withWorkspaceSwitch } from '@/lib/settings'
 
 type Props = {
   open: boolean
@@ -24,11 +25,11 @@ type Props = {
 }
 
 function cursorMetaAnalysisDeeplink(id: number) {
-  const prompt = [
+  const prompt = withWorkspaceSwitch([
     `I want to chat about an interest meta-analysis stored in summaries.db (SQLite, workspace root).`,
     `First fetch it: sqlite3 summaries.db "SELECT id, content, created_at FROM meta_analyses WHERE id = ${id}"`,
     `Read the content, give me a brief recap of the current interests and how desires/needs evolved, then answer my follow-up questions using that analysis as context.`,
-  ].join('\n')
+  ])
   return `cursor://anysphere.cursor-deeplink/prompt?text=${encodeURIComponent(prompt)}`
 }
 

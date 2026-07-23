@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Connect } from 'vite'
 import { parseListPageQuery } from '../lib/list-page'
 import {
+  countPendingBookmarkSummaries,
   listBookmarksPage,
   patchBookmark,
   softDeleteBookmark,
@@ -21,6 +22,18 @@ export function bookmarksMiddleware(
   if (req.method === 'GET' && (pathname === '/' || pathname === '')) {
     try {
       sendJson(res, 200, listBookmarksPage(parseListPageQuery(url.searchParams)))
+    } catch (error) {
+      sendJson(res, 500, { error: String(error) })
+    }
+    return
+  }
+
+  if (
+    req.method === 'GET'
+    && (pathname === '/summary-status' || pathname === '/summary-status/')
+  ) {
+    try {
+      sendJson(res, 200, { pending: countPendingBookmarkSummaries() })
     } catch (error) {
       sendJson(res, 500, { error: String(error) })
     }

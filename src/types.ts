@@ -50,6 +50,9 @@ export type BookmarkRow = {
   title: string
   folder_path: string
   chrome_profile: string
+  summary_text: string | null
+  summary_status: 'pending' | 'complete' | 'error'
+  summary_error: string | null
   notebooklm_url: string | null
   notebooklm_links: NotebookLink[]
   last_viewed: string | null
