@@ -1,6 +1,6 @@
 # notebook-garden merge plan
 
-Unified local app merging `watch-laterer` (YouTube summary ingestion UI) and `notebooklm-browser` (NotebookLM library tending). Python Watch Later drain scripts remain in `watch-laterer` unchanged; this app reads the same SQLite file they write to.
+Unified local app merging YouTube summary ingestion UI and NotebookLM library tending (historically from `watch-laterer` + `notebooklm-browser`; `watch-laterer` is archive-only). Python Watch Later drain scripts live in `~/.cursor/skills/youtube-ask-summarize/scripts/`; this app reads the SQLite file they write to.
 
 ## UX model
 
@@ -32,7 +32,7 @@ User maintains their NotebookLM corpus: sync, rename, tag, pin, delete, create e
 |----------|--------|-----------|
 | Repo name | `notebook-garden` | Matches organization metaphor |
 | Database | Single `summaries.db` | Python scripts already use this name/path; add `notebooks` table via migration |
-| DB env | `APP_DB` (fallback `WATCH_LATERER_DB`, then `summaries.db`) | Python compat + clarity |
+| DB env | `APP_DB` (fallback `summaries.db`) | Clarity; no legacy env names |
 | NotebookLM client | One `src/server/notebooklm/` module | All RPCs: list, create, rename, delete, add-source, create-and-import |
 | Auth | Newest Playwright profile cookie strategy from both repos (identical) | `NOTEBOOKLM_COOKIE` override, `YT_PROFILE_DIR`, headed login retry |
 | API server | Hono (`server/app.ts`) + Vite dev proxy | Single route table; local-only, no deploy split |
@@ -117,4 +117,4 @@ User maintains their NotebookLM corpus: sync, rename, tag, pin, delete, create e
 2. Create notebook from summary updates entry + library cache.
 3. Library sync/create/rename/delete works with Playwright profile auth.
 4. Tests pass: `npm run test:run`.
-5. watch-laterer Python scripts untouched; documented path to shared DB.
+5. YouTube Ask scripts live in the youtube-ask-summarize skill; documented `--db` path to shared DB.
