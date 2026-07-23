@@ -106,6 +106,8 @@ const BookmarkCard = memo(function BookmarkCard({
   const [importError, setImportError] = useState<string | null>(null)
   const [tagDraft, setTagDraft] = useState('')
   const [tagInputOpen, setTagInputOpen] = useState(false)
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const summary = bookmark.summary_text ?? ''
 
   async function markViewed() {
     try {
@@ -349,6 +351,27 @@ const BookmarkCard = memo(function BookmarkCard({
         </CardAction>
       </CardHeader>
       <CardContent className="space-y-3 border-t pt-4">
+        {summary ? (
+          <>
+            <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+              {summaryOpen ? summary : summary.slice(0, 420)}
+            </div>
+            {summary.length > 420 ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setSummaryOpen((v) => !v)}
+              >
+                {summaryOpen ? 'Show less' : 'Show more'}
+              </Button>
+            ) : null}
+          </>
+        ) : bookmark.summary_status === 'error' ? (
+          <p className="text-sm text-muted-foreground">
+            Summary failed{bookmark.summary_error ? `: ${bookmark.summary_error}` : '.'}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {bookmark.notebooklm_links.length === 0 ? (
             <Button
@@ -482,6 +505,7 @@ export default function BookmarksView() {
   )
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
+  const [pendingSummaries, setPendingSummaries] = useState<number | null>(null)
 
   const listFilters = useMemo(() => ({
     sort: sortKey,
@@ -522,6 +546,23 @@ export default function BookmarksView() {
       setTagFilter('all')
     }
   }, [allTags, tagFilter])
+
+  useEffect(() => {
+    if (loading) return
+    let cancelled = false
+    void fetch('/api/bookmarks/summary-status')
+      .then(async (response) => {
+        if (!response.ok) return
+        const payload = (await response.json()) as { pending?: number }
+        if (!cancelled && typeof payload.pending === 'number') {
+          setPendingSummaries(payload.pending)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [loading, total])
 
   const selectedCount = selectedIds.size
 
@@ -797,7 +838,13 @@ export default function BookmarksView() {
         ) : null}
         <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              {loading ? 'Loading bookmarks…' : `${total} bookmarks`}
+              {loading
+                ? 'Loading bookmarks…'
+                : `${total} bookmarks${
+                    pendingSummaries != null && pendingSummaries > 0
+                      ? ` · ${pendingSummaries} left to summarize`
+                      : ''
+                  }`}
             </p>
           <div className="flex flex-wrap items-center gap-3">
             <label className="flex items-center gap-2 text-sm text-muted-foreground">

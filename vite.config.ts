@@ -8,6 +8,7 @@ import { linkedinSavedMiddleware } from './src/server/linkedin-saved-middleware'
 import { notebooklmMiddleware } from './src/server/notebooklm-routes'
 import { notebooksApiMiddleware } from './src/server/notebooks-api'
 import { metaAnalysisMiddleware } from './src/server/meta-analysis-middleware'
+import { settingsMiddleware } from './src/server/settings-middleware'
 
 function apiPlugin() {
   return {
@@ -19,6 +20,7 @@ function apiPlugin() {
       server.middlewares.use('/api/notebooklm', notebooklmMiddleware)
       server.middlewares.use('/api/notebooks', notebooksApiMiddleware)
       server.middlewares.use('/api/meta-analysis', metaAnalysisMiddleware)
+      server.middlewares.use('/api/settings', settingsMiddleware)
     },
     configurePreviewServer(server: PreviewServer) {
       server.middlewares.use('/api/entries', entriesMiddleware)
@@ -27,6 +29,7 @@ function apiPlugin() {
       server.middlewares.use('/api/notebooklm', notebooklmMiddleware)
       server.middlewares.use('/api/notebooks', notebooksApiMiddleware)
       server.middlewares.use('/api/meta-analysis', metaAnalysisMiddleware)
+      server.middlewares.use('/api/settings', settingsMiddleware)
     },
   }
 }

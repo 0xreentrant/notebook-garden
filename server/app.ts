@@ -8,6 +8,7 @@ import {
   softDeleteEntry,
 } from '../src/server/entries-api'
 import {
+  countPendingBookmarkSummaries,
   listBookmarksPage,
   patchBookmark,
   softDeleteBookmark,
@@ -29,6 +30,7 @@ import {
   generateMetaAnalysis,
   getLatestMetaAnalysis,
 } from '../src/server/meta-analysis-api'
+import { getSettings, putSettings } from '../src/server/settings-api'
 import {
   createNotebookViaApi,
   deleteNotebookViaApi,
@@ -81,6 +83,36 @@ export function createApp() {
   const app = new Hono()
 
   app.get('/api/health', (c) => c.json({ ok: true }))
+
+  app.get('/api/settings', (c) => {
+    try {
+      return c.json(getSettings())
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.put('/api/settings', async (c) => {
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+    const patch = body as { obsidianVault?: unknown }
+    if (patch.obsidianVault !== undefined && typeof patch.obsidianVault !== 'string') {
+      return c.json({ error: 'obsidianVault must be a string' }, 400)
+    }
+    try {
+      return c.json(
+        putSettings({
+          obsidianVault: typeof patch.obsidianVault === 'string' ? patch.obsidianVault : undefined,
+        }),
+      )
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
 
   app.get('/api/meta-analysis', (c) => {
     try {
@@ -149,6 +181,14 @@ export function createApp() {
   app.get('/api/bookmarks', (c) => {
     try {
       return c.json(listBookmarksPage(parseListPageQuery(new URL(c.req.url).searchParams)))
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.get('/api/bookmarks/summary-status', (c) => {
+    try {
+      return c.json({ pending: countPendingBookmarkSummaries() })
     } catch (error) {
       return c.json({ error: String(error) }, 500)
     }

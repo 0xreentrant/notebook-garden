@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { BookmarkIcon, BookOpenIcon, LinkIcon, SparklesIcon, SproutIcon } from 'lucide-react'
+import { fetchSettings } from '@/api/settings'
 import MetaAnalysisModal from '@/components/MetaAnalysisModal'
+import SettingsMenu from '@/components/SettingsMenu'
 import { Button } from '@/components/ui/button'
+import { writeObsidianVault } from '@/lib/settings'
 import { cn } from '@/lib/utils'
 import type { AppView } from '@/types'
 import BookmarksView from '@/views/BookmarksView'
@@ -40,6 +43,12 @@ export default function App() {
   const [view, setView] = useState<AppView>('summaries')
   const [metaOpen, setMetaOpen] = useState(false)
 
+  useEffect(() => {
+    void fetchSettings()
+      .then((settings) => writeObsidianVault(settings.obsidianVault))
+      .catch(() => {})
+  }, [])
+
   return (
     <main className="min-h-screen px-4 py-10 sm:px-6">
       <div className="mx-auto flex max-w-3xl flex-col gap-6">
@@ -53,16 +62,19 @@ export default function App() {
                 Plant notebooks from summarized videos and bookmarks, then tend your library.
               </p>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              title="Meta-analyze interests across summaries"
-              onClick={() => setMetaOpen(true)}
-            >
-              <SparklesIcon className="size-4" />
-              Interests
-            </Button>
+            <div className="flex items-center gap-2">
+              <SettingsMenu />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                title="Meta-analyze interests across summaries"
+                onClick={() => setMetaOpen(true)}
+              >
+                <SparklesIcon className="size-4" />
+                Interests
+              </Button>
+            </div>
           </div>
           <nav className="flex flex-wrap gap-2" aria-label="Main">
             {TABS.map(({ id, label, description, icon: Icon }) => (

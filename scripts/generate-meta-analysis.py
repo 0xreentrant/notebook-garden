@@ -20,6 +20,9 @@ if WATCH_LATERER_SCRIPTS.is_dir():
 
 from follow_up_questions_lib import resolve_cursor_agent_command  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from obsidian_vault import with_workspace_switch  # noqa: E402
+
 FOLLOW_UP_CUT = re.compile(
     r"(?ms)^[ \t]*#{2,3}[ \t]*Follow-up questions.*\Z|"
     r"^[ \t]*\*\*Follow-up questions:\*\*.*\Z",
@@ -28,9 +31,9 @@ FOLLOW_UP_CUT = re.compile(
 EXCERPT_CHARS = 320
 
 SYSTEM_PROMPT = """You are analyzing one person's personal knowledge corpus, saved and studied across four sources:
-- YouTube Watch Later → Ask summaries (dated, with excerpts)
-- LinkedIn saved posts / articles (author + short summary where available)
-- Browser bookmarks (title + folder + tags, no body)
+- YouTube Watch Later → Ask summaries (dated, with excerpts - be aware that all QA questions are AI-generated from my personal context)
+- LinkedIn saved posts / articles (author + short summary or captured text where available)
+- Browser bookmarks (title + folder + tags; many include a generated page summary excerpt - treat those as primary evidence, titles alone as weaker signal)
 - NotebookLM notebooks (title + tags + source count)
 
 This is a personal interest archaeology task, not a catalog.
@@ -48,6 +51,8 @@ Rules:
 - Ground claims in the corpus (cite a few example titles + dates, noting the source when useful, for non-obvious claims)
 - Treat all four sources as one person's signal; look for themes that cross sources
 - Prefer patterns over listing every item
+- Weight deeper evidence higher: YouTube Ask summaries and bookmark page summaries > LinkedIn text > titles/folders alone
+- Bookmark folders and user tags are intentional self-labels - use them, but do not let them override summary content
 - Do not invent biography facts that are not implied by the material
 - No fluff openers; start with the substance
 - Output markdown only (no JSON wrapper, no code fences around the whole document)
@@ -82,7 +87,20 @@ def source_fingerprint(conn) -> str:
     s = _table_fingerprint(
         conn, "summary_entries", "WHERE status = 'complete' AND deleted_at IS NULL", "updated_at"
     )
-    b = _table_fingerprint(conn, "bookmarks", "WHERE deleted_at IS NULL", "updated_at")
+    # Include complete-summary count: bookmark summarizer does not bump updated_at.
+    try:
+        brow = conn.execute(
+            """
+            SELECT COUNT(*) AS n,
+                   COALESCE(MAX(updated_at), '') AS mx,
+                   SUM(CASE WHEN summary_status = 'complete' THEN 1 ELSE 0 END) AS sc
+            FROM bookmarks
+            WHERE deleted_at IS NULL
+            """
+        ).fetchone()
+        b = f"{brow['n']}:{brow['mx']}:{brow['sc'] or 0}"
+    except sqlite3.OperationalError:
+        b = "0::0"
     li = _table_fingerprint(conn, "linkedin_saved_items", "WHERE deleted_at IS NULL", "updated_at")
     nb = _table_fingerprint(conn, "notebooks", "", "created_at")
     return f"s{s}|b{b}|l{li}|nb{nb}"
@@ -132,7 +150,7 @@ def build_corpus(db_path: Path) -> tuple[str, str, int]:
     bookmarks = _safe_query(
         conn,
         """
-        SELECT title, url, folder_path, tags, created_at
+        SELECT title, url, folder_path, tags, created_at, summary_text, summary_status
         FROM bookmarks
         WHERE deleted_at IS NULL
         ORDER BY created_at ASC, id ASC
@@ -150,10 +168,14 @@ def build_corpus(db_path: Path) -> tuple[str, str, int]:
     fingerprint = source_fingerprint(conn)
     conn.close()
 
+    bookmark_summarized = sum(
+        1 for row in bookmarks if row["summary_status"] == "complete" and (row["summary_text"] or "").strip()
+    )
     total = len(summaries) + len(linkedin) + len(bookmarks) + len(notebooks)
     lines: list[str] = [
         f"Corpus size: {len(summaries)} YouTube summaries, {len(linkedin)} LinkedIn saves, "
-        f"{len(bookmarks)} bookmarks, {len(notebooks)} notebooks.",
+        f"{len(bookmarks)} bookmarks ({bookmark_summarized} with page summaries in this window), "
+        f"{len(notebooks)} notebooks.",
         "",
         "## YouTube Watch Later summaries",
         "Each entry: date | title, then a short excerpt of the Ask summary.",
@@ -176,18 +198,29 @@ def build_corpus(db_path: Path) -> tuple[str, str, int]:
         headline = (row["author_headline"] or "").strip()
         who = f"{author} — {headline}" if author and headline else author
         lines.append(f"### {date} | {title}" + (f" · {who}" if who else ""))
-        body = row["summary_text"] or row["content_text"] or ""
+        body = strip_follow_up(row["summary_text"] or "") or (row["content_text"] or "")
         excerpt = re.sub(r"\s+", " ", body)[:EXCERPT_CHARS].strip()
         if excerpt:
             lines.append(excerpt)
         lines.append("")
 
-    lines += ["## Browser bookmarks (title + folder + tags)", ""]
+    lines += [
+        "## Browser bookmarks",
+        "Prefer entries that include a page-summary excerpt. Title/folder-only rows are weaker signal.",
+        "",
+    ]
     for row in bookmarks:
         date = (row["created_at"] or "")[:10]
         folder = (row["folder_path"] or "").strip()
         suffix = f" — {folder}" if folder else ""
-        lines.append(f"- {date} | {row['title']}{suffix}{_tags(row['tags'])}")
+        summary = strip_follow_up(row["summary_text"] or "") if row["summary_status"] == "complete" else ""
+        excerpt = re.sub(r"\s+", " ", summary)[:EXCERPT_CHARS].strip()
+        if excerpt:
+            lines.append(f"### {date} | {row['title']}{suffix}{_tags(row['tags'])}")
+            lines.append(excerpt)
+            lines.append("")
+        else:
+            lines.append(f"- {date} | {row['title']}{suffix}{_tags(row['tags'])}")
     lines.append("")
 
     lines += ["## NotebookLM notebooks", ""]
@@ -361,9 +394,10 @@ def main() -> int:
         print("No saved items to analyze.", file=sys.stderr)
         return 1
 
-    prompt = (
+    prompt = with_workspace_switch(
         f"{SYSTEM_PROMPT}\n\n---\n\n# Corpus\n\n{corpus}\n\n---\n\n"
-        "Now write the meta-analysis markdown report."
+        "Now write the meta-analysis markdown report.",
+        args.db,
     )
     text = call_cursor_agent_streaming(
         prompt=prompt,

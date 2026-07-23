@@ -69,11 +69,11 @@ beforeAll(() => {
   db.close()
 
   // Fingerprint matches the seeded row: 1 complete entry, max(updated_at) = 2026-01-01.
-  // Other source tables are absent, so they contribute the missing-table sentinel "0:".
+  // Other source tables are absent; bookmarks use the missing-table sentinel "0::0".
   fs.writeFileSync(OK_SCRIPT, [
     'import sys, time',
     'time.sleep(0.3)',
-    'sys.stderr.write("s1:2026-01-01|b0:|l0:|nb0:\\n")',
+    'sys.stderr.write("s1:2026-01-01|b0::0|l0:|nb0:\\n")',
     'print("# analysis body")',
   ].join('\n'))
   fs.writeFileSync(FAIL_SCRIPT, [
@@ -92,7 +92,7 @@ beforeAll(() => {
     'time.sleep(0.15)',
     'live({"kind":"delta","text":" world"})',
     'time.sleep(0.4)',
-    'sys.stderr.write("s1:2026-01-01|b0:|l0:|nb0:\\n")',
+    'sys.stderr.write("s1:2026-01-01|b0::0|l0:|nb0:\\n")',
     'print("# live analysis")',
   ].join('\n'))
 })
