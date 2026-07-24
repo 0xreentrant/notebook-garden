@@ -8,7 +8,7 @@ describe('app tabs', () => {
       '/summaries',
       '/bookmarks',
       '/linkedin',
-      '/library',
+      '/notebooks',
     ])
   })
 
@@ -17,7 +17,7 @@ describe('app tabs', () => {
       'Summaries',
       'Bookmarks',
       'LinkedIn Saved',
-      'Library',
+      'Notebooks',
     ])
   })
 })

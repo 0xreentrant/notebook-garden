@@ -22,7 +22,7 @@ const TAB_ICONS: Record<AppTabPath, LucideIcon> = {
   '/summaries': SproutIcon,
   '/bookmarks': BookmarkIcon,
   '/linkedin': LinkIcon,
-  '/library': BookOpenIcon,
+  '/notebooks': BookOpenIcon,
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -72,7 +72,7 @@ export default function Root() {
                 notebook-garden
               </h1>
               <p className="text-sm text-muted-foreground">
-                Plant notebooks from summarized videos and bookmarks, then tend your library.
+                Plant notebooks from summarized videos and bookmarks, then tend your notebooks.
               </p>
             </div>
             <div className="flex items-center gap-2">

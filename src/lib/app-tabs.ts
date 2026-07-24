@@ -17,9 +17,9 @@ export const APP_TABS = [
     description: 'Browse captured LinkedIn Saved items',
   },
   {
-    path: '/library',
-    label: 'Library',
-    description: 'Tend your NotebookLM garden',
+    path: '/notebooks',
+    label: 'Notebooks',
+    description: 'Tend your NotebookLM notebooks',
   },
 ] as const
 

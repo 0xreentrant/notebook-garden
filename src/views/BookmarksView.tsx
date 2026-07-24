@@ -1085,7 +1085,7 @@ export default function BookmarksView() {
                 <p className="text-sm text-muted-foreground">Loading notebooks…</p>
               ) : bulkNotebookOptions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
-                  No notebooks in the local cache. Sync from Library first.
+                  No notebooks in the local cache. Sync from Notebooks first.
                 </p>
               ) : filteredBulkNotebookOptions.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No notebooks match.</p>
