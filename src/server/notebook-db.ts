@@ -12,6 +12,7 @@ import {
   collectTagsFromRows,
   decodeCursor,
   encodeCursor,
+  tagsForPage,
   whereSql,
 } from './list-page'
 
@@ -129,8 +130,10 @@ export function listCachedNotebooksPage(query: ListPageQuery): ListPage<Notebook
       SELECT COUNT(*) AS count FROM notebooks ${where}
     `).get(...filters.values) as { count: number }).count
 
-    const tags = collectTagsFromRows(
-      sqlite.prepare(`SELECT tags FROM notebooks`).all() as { tags: string }[],
+    const tags = tagsForPage(query.cursor, () =>
+      collectTagsFromRows(
+        sqlite.prepare(`SELECT tags FROM notebooks`).all() as { tags: string }[],
+      ),
     )
 
     const rows = sqlite.prepare(`

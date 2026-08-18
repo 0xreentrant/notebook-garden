@@ -4,6 +4,7 @@ import { parseListPageQuery } from '../lib/list-page'
 import {
   countPendingBookmarkSummaries,
   listBookmarksPage,
+  getBookmark,
   patchBookmark,
   softDeleteBookmark,
   syncBookmarksFromChrome,
@@ -43,6 +44,20 @@ export function bookmarksMiddleware(
   if (req.method === 'POST' && (pathname === '/sync' || pathname === '/sync/')) {
     try {
       sendJson(res, 200, syncBookmarksFromChrome())
+    } catch (error) {
+      sendJson(res, 500, { error: String(error) })
+    }
+    return
+  }
+
+  if (req.method === 'GET' && idMatch) {
+    try {
+      const result = getBookmark(Number(idMatch[1]))
+      if (!result.ok) {
+        sendJson(res, result.status, { error: result.error })
+        return
+      }
+      sendJson(res, 200, result.row)
     } catch (error) {
       sendJson(res, 500, { error: String(error) })
     }

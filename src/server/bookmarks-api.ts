@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import Database from 'better-sqlite3'
 import { getDbPath } from '../db/paths'
 import type { ListPage, ListPageQuery } from '../lib/list-page'
+import { LIST_TEXT_PREVIEW_CHARS } from '../lib/list-page'
 import {
   appendNotebookLink,
   parseNotebookLinks,
@@ -19,12 +20,22 @@ import {
   collectTagsFromRows,
   decodeCursor,
   encodeCursor,
+  tagsForPage,
   whereSql,
 } from './list-page'
 
 export const BOOKMARK_COLUMNS = `
   id, url, title, folder_path, chrome_profile,
   summary_text, summary_status, summary_error,
+  notebooklm_url, notebooklm_links, last_viewed, pinned, tags,
+  created_at, updated_at, deleted_at
+`
+
+export const BOOKMARK_LIST_COLUMNS = `
+  id, url, title, folder_path, chrome_profile,
+  substr(summary_text, 1, ${LIST_TEXT_PREVIEW_CHARS}) as summary_text,
+  (length(COALESCE(summary_text, '')) > ${LIST_TEXT_PREVIEW_CHARS}) AS summary_overflow,
+  summary_status, summary_error,
   notebooklm_url, notebooklm_links, last_viewed, pinned, tags,
   created_at, updated_at, deleted_at
 `
@@ -36,6 +47,7 @@ export type RawBookmarkRow = {
   folder_path: string
   chrome_profile: string
   summary_text: string | null
+  summary_overflow?: number
   summary_status: 'pending' | 'complete' | 'error'
   summary_error: string | null
   notebooklm_url: string | null
@@ -74,6 +86,7 @@ export function formatBookmarkRow(raw: RawBookmarkRow) {
     tags: parseTags(raw.tags),
     notebooklm_links,
     notebooklm_url: notebooklm_links.at(-1)?.url ?? raw.notebooklm_url,
+    summary_overflow: Boolean(raw.summary_overflow),
   }
 }
 
@@ -134,12 +147,14 @@ export function listBookmarksPage(query: ListPageQuery): ListPage<ReturnType<typ
       SELECT COUNT(*) AS count FROM bookmarks ${where}
     `).get(...filters.values) as { count: number }).count
 
-    const tags = collectTagsFromRows(
-      db.prepare(`SELECT tags FROM bookmarks WHERE deleted_at IS NULL`).all() as { tags: string }[],
+    const tags = tagsForPage(query.cursor, () =>
+      collectTagsFromRows(
+        db.prepare(`SELECT tags FROM bookmarks WHERE deleted_at IS NULL`).all() as { tags: string }[],
+      ),
     )
 
     const rows = db.prepare(`
-      SELECT ${BOOKMARK_COLUMNS}
+      SELECT ${BOOKMARK_LIST_COLUMNS}
       FROM bookmarks
       ${where}
       ORDER BY ${orderBy}
@@ -159,15 +174,34 @@ export function listBookmarksPage(query: ListPageQuery): ListPage<ReturnType<typ
 }
 
 function summarizeBookmarksInBackground(ids: number[]) {
+  queuedSummarizerIds.push(...ids)
+  pumpBookmarkSummarizer()
+}
+
+// ponytail: one in-process child at a time; queue is lost on restart. Upgrade to a DB job row if overlap across processes matters.
+let summarizerChild: ReturnType<typeof spawn> | null = null
+const queuedSummarizerIds: number[] = []
+
+function pumpBookmarkSummarizer() {
+  if (summarizerChild || queuedSummarizerIds.length === 0) return
+  const ids = queuedSummarizerIds.splice(0)
   const script = path.resolve(
     path.dirname(fileURLToPath(import.meta.url)),
     '../../scripts/generate-bookmark-summaries.py',
   )
-  spawn(
+  const child = spawn(
     'python3',
     [script, '--db', getDbPath(), '--ids', ids.join(','), '--sleep', '5'],
-    { detached: true, stdio: 'ignore' },
-  ).unref()
+    { stdio: 'ignore' },
+  )
+  summarizerChild = child
+  const release = () => {
+    if (summarizerChild === child) summarizerChild = null
+    pumpBookmarkSummarizer()
+  }
+  child.on('close', release)
+  child.on('error', release)
+  child.unref()
 }
 
 export function syncBookmarksFromChrome(userDataDir?: string) {
@@ -316,12 +350,27 @@ export function patchBookmark(id: number, payload: BookmarkPatchPayload) {
     }
 
     const row = db.prepare(`
-      SELECT ${BOOKMARK_COLUMNS}
+      SELECT ${BOOKMARK_LIST_COLUMNS}
       FROM bookmarks
       WHERE id = ?
     `).get(id) as RawBookmarkRow | undefined
 
     return { ok: true as const, row: row ? formatBookmarkRow(row) : null }
+  } finally {
+    db.close()
+  }
+}
+
+export function getBookmark(id: number) {
+  const db = openDb(true)
+  try {
+    const row = db.prepare(`
+      SELECT ${BOOKMARK_COLUMNS}
+      FROM bookmarks
+      WHERE id = ? AND deleted_at IS NULL
+    `).get(id) as RawBookmarkRow | undefined
+    if (!row) return { ok: false as const, status: 404, error: 'Bookmark not found' }
+    return { ok: true as const, row: formatBookmarkRow(row) }
   } finally {
     db.close()
   }

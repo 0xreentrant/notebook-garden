@@ -14,6 +14,7 @@ import {
   collectTagsFromRows,
   decodeCursor,
   encodeCursor,
+  tagsForPage,
   whereSql,
 } from './list-page'
 
@@ -25,6 +26,14 @@ export const ENTRY_COLUMNS = `
   notebooklm_url, notebooklm_links, last_viewed, pinned, tags, created_at, updated_at, deleted_at
 `
 
+export const ENTRY_LIST_COLUMNS = `
+  id, video_id, title, url, status, skip_backfill,
+  error_message, transcript_error,
+  notebooklm_url, notebooklm_links, last_viewed, pinned, tags, created_at, updated_at, deleted_at,
+  (length(trim(COALESCE(summary_text, ''))) > 0) AS has_summary,
+  (length(trim(COALESCE(transcript_text, ''))) > 0) AS has_transcript
+`
+
 export type RawEntryRow = {
   id: number
   video_id: string
@@ -33,9 +42,11 @@ export type RawEntryRow = {
   status: string
   skip_backfill: number
   error_message: string | null
-  summary_text: string | null
-  transcript_text: string | null
+  summary_text?: string | null
+  transcript_text?: string | null
   transcript_error: string | null
+  has_summary?: number
+  has_transcript?: number
   notebooklm_url: string | null
   notebooklm_links: string
   last_viewed: string | null
@@ -69,12 +80,20 @@ function isNotebookLink(value: unknown): value is NotebookLink {
 
 export function formatEntryRow(raw: RawEntryRow) {
   const notebooklm_links = parseNotebookLinks(raw.notebooklm_links)
+  const has_summary = raw.has_summary != null
+    ? Boolean(raw.has_summary)
+    : Boolean(raw.summary_text?.trim())
+  const has_transcript = raw.has_transcript != null
+    ? Boolean(raw.has_transcript)
+    : Boolean(raw.transcript_text?.trim())
   return {
     ...raw,
     tags: parseTags(raw.tags),
     notebooklm_links,
     // ponytail: keep notebooklm_url as latest link for older readers; multi-link source of truth is notebooklm_links
     notebooklm_url: notebooklm_links.at(-1)?.url ?? raw.notebooklm_url,
+    has_summary,
+    has_transcript,
   }
 }
 
@@ -115,12 +134,14 @@ export function listEntriesPage(query: ListPageQuery): ListPage<ReturnType<typeo
       SELECT COUNT(*) AS count FROM summary_entries ${where}
     `).get(...filters.values) as { count: number }).count
 
-    const tags = collectTagsFromRows(
-      db.prepare(`SELECT tags FROM summary_entries WHERE deleted_at IS NULL`).all() as { tags: string }[],
+    const tags = tagsForPage(query.cursor, () =>
+      collectTagsFromRows(
+        db.prepare(`SELECT tags FROM summary_entries WHERE deleted_at IS NULL`).all() as { tags: string }[],
+      ),
     )
 
     const rows = db.prepare(`
-      SELECT ${ENTRY_COLUMNS}
+      SELECT ${ENTRY_LIST_COLUMNS}
       FROM summary_entries
       ${where}
       ORDER BY ${orderBy}
@@ -234,12 +255,27 @@ export function patchEntry(id: number, payload: EntryPatchPayload) {
     }
 
     const row = db.prepare(`
-      SELECT ${ENTRY_COLUMNS}
+      SELECT ${ENTRY_LIST_COLUMNS}
       FROM summary_entries
       WHERE id = ?
     `).get(id) as RawEntryRow | undefined
 
     return { ok: true as const, row: row ? formatEntryRow(row) : null }
+  } finally {
+    db.close()
+  }
+}
+
+export function getEntry(id: number) {
+  const db = openDb(true)
+  try {
+    const row = db.prepare(`
+      SELECT ${ENTRY_COLUMNS}
+      FROM summary_entries
+      WHERE id = ? AND deleted_at IS NULL
+    `).get(id) as RawEntryRow | undefined
+    if (!row) return { ok: false as const, status: 404, error: 'Entry not found' }
+    return { ok: true as const, row: formatEntryRow(row) }
   } finally {
     db.close()
   }

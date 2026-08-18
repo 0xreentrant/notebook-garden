@@ -1,4 +1,20 @@
 export const DEFAULT_PAGE_SIZE = 50
+export const LIST_TEXT_PREVIEW_CHARS = 420
+// ponytail: drop oldest pages after this many rows so a long scroll cannot retain the whole table.
+// Window virtualizer may jump when the head is trimmed; upgrade to keyset + scroll compensation if that becomes annoying.
+export const MAX_RETAINED_ITEMS = 250
+
+export function appendPageItems<T extends { id: number }>(
+  current: T[],
+  incoming: T[],
+  max = MAX_RETAINED_ITEMS,
+): T[] {
+  const seen = new Set(current.map((item) => item.id))
+  const appended = incoming.filter((item) => !seen.has(item.id))
+  if (appended.length === 0) return current
+  const next = [...current, ...appended]
+  return next.length <= max ? next : next.slice(next.length - max)
+}
 
 export type SortKey = 'created_desc' | 'created_asc' | 'viewed_desc' | 'viewed_asc'
 export type NotebookSortKey = SortKey | 'sources_desc' | 'sources_asc'

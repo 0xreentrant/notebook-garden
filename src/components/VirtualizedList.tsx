@@ -70,6 +70,8 @@ export function VirtualizedList({
   const [scrollMargin, setScrollMargin] = useState(0)
   const loadingMoreRef = useRef(loadingMore)
   loadingMoreRef.current = loadingMore
+  const onLoadMoreRef = useRef(onLoadMore)
+  onLoadMoreRef.current = onLoadMore
 
   useLayoutEffect(() => {
     setScrollMargin(listRef.current?.offsetTop ?? 0)
@@ -96,9 +98,9 @@ export function VirtualizedList({
   useEffect(() => {
     if (!lastItem || !hasMore || loadingMoreRef.current) return
     if (lastItem.index >= rows.length - LOAD_MORE_THRESHOLD) {
-      onLoadMore()
+      onLoadMoreRef.current()
     }
-  }, [hasMore, lastItem, onLoadMore, rows.length])
+  }, [hasMore, lastItem, rows.length])
 
   return (
     <div ref={listRef} className={className}>

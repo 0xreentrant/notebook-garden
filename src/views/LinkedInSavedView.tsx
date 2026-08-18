@@ -67,7 +67,22 @@ const LinkedInCard = memo(function LinkedInCard({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const body = item.summary_text || item.content_text || ''
+  const [fullBody, setFullBody] = useState<string | null>(null)
+  const preview = item.summary_text || item.content_text || ''
+  const body = fullBody ?? preview
+  const textOverflow = Boolean(item.text_overflow) || (
+    fullBody != null && fullBody.length > preview.length
+  )
+
+  async function loadFullBody() {
+    if (fullBody != null || !item.text_overflow) return fullBody ?? preview
+    const response = await fetch(`/api/linkedin-saved/${item.id}`)
+    if (!response.ok) return preview
+    const row = (await response.json()) as LinkedInSavedItemRow
+    const next = row.summary_text || row.content_text || ''
+    setFullBody(next)
+    return next
+  }
 
   async function createNotebook() {
     setBusy(true)
@@ -93,8 +108,9 @@ const LinkedInCard = memo(function LinkedInCard({
   }
 
   async function copyContent() {
-    if (!body) return
-    await navigator.clipboard.writeText(body)
+    const text = await loadFullBody()
+    if (!text) return
+    await navigator.clipboard.writeText(text)
   }
 
   return (
@@ -160,8 +176,16 @@ const LinkedInCard = memo(function LinkedInCard({
         ) : (
           <p className="text-muted-foreground">No captured text.</p>
         )}
-        {body.length > 420 ? (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setOpen((v) => !v)}>
+        {body.length > 0 && textOverflow ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (!open) void loadFullBody()
+              setOpen((value) => !value)
+            }}
+          >
             {open ? 'Show less' : 'Show more'}
           </Button>
         ) : null}

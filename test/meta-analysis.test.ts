@@ -144,6 +144,7 @@ describe('meta-analysis background generation', () => {
     expect(generateMetaAnalysis({ force: true }).started).toBe(true)
     const mid = await waitForLive()
     expect(mid.generating).toBe(true)
+    expect(mid.analysis?.content).toBe('')
     expect(mid.liveDraft).toContain('Hello')
     expect(mid.liveTools).toContain('read README.md')
 

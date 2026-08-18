@@ -4,18 +4,21 @@ import { parseTags, serializeTags } from '../src/lib/tags'
 import { parseListPageQuery } from '../src/lib/list-page'
 import {
   listEntriesPage,
+  getEntry,
   patchEntry,
   softDeleteEntry,
 } from '../src/server/entries-api'
 import {
   countPendingBookmarkSummaries,
   listBookmarksPage,
+  getBookmark,
   patchBookmark,
   softDeleteBookmark,
   syncBookmarksFromChrome,
 } from '../src/server/bookmarks-api'
 import {
   listLinkedInSavedPage,
+  getLinkedInSaved,
   patchLinkedInSaved,
   softDeleteLinkedInSaved,
 } from '../src/server/linkedin-saved-api'
@@ -145,6 +148,18 @@ export function createApp() {
     }
   })
 
+  app.get('/api/entries/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+    try {
+      const result = getEntry(id)
+      if (!result.ok) return c.json({ error: result.error }, 404)
+      return c.json(result.row)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
   app.patch('/api/entries/:id', async (c) => {
     const id = Number(c.req.param('id'))
     if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
@@ -202,6 +217,18 @@ export function createApp() {
     }
   })
 
+  app.get('/api/bookmarks/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+    try {
+      const result = getBookmark(id)
+      if (!result.ok) return c.json({ error: result.error }, 404)
+      return c.json(result.row)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
   app.patch('/api/bookmarks/:id', async (c) => {
     const id = Number(c.req.param('id'))
     if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
@@ -238,6 +265,18 @@ export function createApp() {
   app.get('/api/linkedin-saved', (c) => {
     try {
       return c.json(listLinkedInSavedPage(parseListPageQuery(new URL(c.req.url).searchParams)))
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.get('/api/linkedin-saved/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+    try {
+      const result = getLinkedInSaved(id)
+      if (!result.ok) return c.json({ error: result.error }, 404)
+      return c.json(result.row)
     } catch (error) {
       return c.json({ error: String(error) }, 500)
     }

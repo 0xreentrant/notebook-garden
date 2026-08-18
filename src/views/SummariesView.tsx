@@ -112,7 +112,7 @@ const SummaryMarkdown = memo(function SummaryMarkdown({ body }: { body: string }
 })
 
 function cursorChatDeeplink(entry: SummaryEntryRow) {
-  const hasTranscript = Boolean(entry.transcript_text?.trim())
+  const hasTranscript = entry.has_transcript
   const prompt = withWorkspaceSwitch([
     `I want to chat about a YouTube video summary stored in summaries.db (SQLite, workspace root).`,
     `First fetch it: sqlite3 summaries.db "SELECT title, url, summary_text, transcript_text FROM summary_entries WHERE id = ${entry.id}"`,
@@ -161,15 +161,35 @@ const EntryCard = memo(function EntryCard({
   const [tagDraft, setTagDraft] = useState('')
   const [tagInputOpen, setTagInputOpen] = useState(false)
   const [transcriptOpen, setTranscriptOpen] = useState(false)
+  const [detail, setDetail] = useState<SummaryEntryRow | null>(null)
+
+  useEffect(() => {
+    if (!open) {
+      setDetail(null)
+      return
+    }
+    let cancelled = false
+    void fetch(`/api/entries/${entry.id}`)
+      .then(async (response) => {
+        if (!response.ok) return
+        const row = (await response.json()) as SummaryEntryRow
+        if (!cancelled) setDetail(row)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [open, entry.id])
 
   const body = useMemo(() => {
     if (entry.status === 'error') {
       return entry.error_message ? `_${entry.error_message}_` : null
     }
-    return entry.summary_text
-      ? prepareSummaryMarkdown(entry.summary_text, entry.url)
+    const summaryText = detail?.summary_text
+    return summaryText
+      ? prepareSummaryMarkdown(summaryText, entry.url)
       : null
-  }, [entry.status, entry.error_message, entry.summary_text, entry.url])
+  }, [entry.status, entry.error_message, detail?.summary_text, entry.url])
 
   async function markViewed() {
     try {
@@ -462,7 +482,7 @@ const EntryCard = memo(function EntryCard({
                   Chat in Cursor
                 </Button>
               ) : null}
-              {entry.transcript_text?.trim() ? (
+              {entry.has_transcript ? (
                 <Button
                   variant="outline"
                   size="sm"
@@ -516,6 +536,8 @@ const EntryCard = memo(function EntryCard({
             </p>
             {body ? (
               <SummaryMarkdown body={body} />
+            ) : entry.has_summary && !detail ? (
+              <p className="text-sm text-muted-foreground">Loading summary…</p>
             ) : (
               <p className="text-sm text-muted-foreground">No summary yet.</p>
             )}
@@ -532,7 +554,7 @@ const EntryCard = memo(function EntryCard({
               </DialogDescription>
             </DialogHeader>
             <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">
-              {entry.transcript_text}
+              {detail?.transcript_text ?? 'Loading transcript…'}
             </pre>
           </div>
           <DialogFooter className="mx-0 mb-0 shrink-0">
