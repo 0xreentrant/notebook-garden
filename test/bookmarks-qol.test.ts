@@ -15,7 +15,10 @@ vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>()
   return {
     ...actual,
-    spawn: vi.fn(() => ({ unref: vi.fn() })),
+    spawn: vi.fn(() => ({
+      unref: vi.fn(),
+      on: vi.fn(),
+    })),
   }
 })
 

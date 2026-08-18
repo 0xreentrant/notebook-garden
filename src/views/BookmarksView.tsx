@@ -107,7 +107,26 @@ const BookmarkCard = memo(function BookmarkCard({
   const [tagDraft, setTagDraft] = useState('')
   const [tagInputOpen, setTagInputOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
-  const summary = bookmark.summary_text ?? ''
+  const [fullSummary, setFullSummary] = useState<string | null>(null)
+  const summary = fullSummary ?? bookmark.summary_text ?? ''
+  const summaryOverflow = Boolean(bookmark.summary_overflow) || (
+    fullSummary != null && fullSummary.length > (bookmark.summary_text?.length ?? 0)
+  )
+
+  async function toggleSummary() {
+    if (!summaryOpen && bookmark.summary_overflow && fullSummary == null) {
+      try {
+        const response = await fetch(`/api/bookmarks/${bookmark.id}`)
+        if (response.ok) {
+          const row = (await response.json()) as BookmarkRow
+          setFullSummary(row.summary_text ?? '')
+        }
+      } catch {
+        // keep preview
+      }
+    }
+    setSummaryOpen((open) => !open)
+  }
 
   async function markViewed() {
     try {
@@ -356,12 +375,12 @@ const BookmarkCard = memo(function BookmarkCard({
             <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
               {summaryOpen ? summary : summary.slice(0, 420)}
             </div>
-            {summary.length > 420 ? (
+            {summaryOverflow ? (
               <Button
                 type="button"
                 size="sm"
                 variant="ghost"
-                onClick={() => setSummaryOpen((v) => !v)}
+                onClick={() => void toggleSummary()}
               >
                 {summaryOpen ? 'Show less' : 'Show more'}
               </Button>

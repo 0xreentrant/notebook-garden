@@ -40,6 +40,7 @@ let liveTools: string[] = []
 
 const LIVE_DRAFT_MAX = 50_000
 const LIVE_TOOLS_MAX = 20
+const STDOUT_MAX = 200_000
 
 function clearLive() {
   liveDraft = ''
@@ -171,11 +172,12 @@ export function getLatestMetaAnalysis(): MetaAnalysisGetResult {
       }
     }
     const analysis = mapRow(raw)
+    const generating = running !== null
     return {
       currentFingerprint: fingerprint,
       cacheHit: analysis.sourceFingerprint === fingerprint,
-      analysis,
-      generating: running !== null,
+      analysis: generating ? { ...analysis, content: '' } : analysis,
+      generating,
       lastError,
       liveDraft,
       liveTools,
@@ -218,7 +220,11 @@ function runGenerator(): Promise<void> {
     let stderrCarry = ''
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
-    child.stdout.on('data', (chunk: string) => { stdout += chunk })
+    child.stdout.on('data', (chunk: string) => {
+      if (stdout.length >= STDOUT_MAX) return
+      stdout += chunk
+      if (stdout.length > STDOUT_MAX) stdout = stdout.slice(0, STDOUT_MAX)
+    })
     child.stderr.on('data', (chunk: string) => {
       const combined = stderrCarry + chunk
       const parts = combined.split(/\r?\n/)

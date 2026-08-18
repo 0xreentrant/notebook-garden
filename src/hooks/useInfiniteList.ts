@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  appendPageItems,
   buildListQueryString,
+  MAX_RETAINED_ITEMS,
   type ListPage,
   type ListPageQuery,
 } from '@/lib/list-page'
@@ -64,6 +66,7 @@ export function useInfiniteList<T extends { id: number }>(
 
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMoreRef.current || loading) return
+    if (items.length >= MAX_RETAINED_ITEMS) return
     loadingMoreRef.current = true
     setLoadingMore(true)
     setLoadMoreError(null)
@@ -71,12 +74,8 @@ export function useInfiniteList<T extends { id: number }>(
     try {
       const page = await fetchPage(nextCursor)
       if (requestId !== requestIdRef.current) return
-      setItems((current) => {
-        const seen = new Set(current.map((item) => item.id))
-        const appended = page.items.filter((item) => !seen.has(item.id))
-        return appended.length === 0 ? current : [...current, ...appended]
-      })
-      setTags(page.tags)
+      setItems((current) => appendPageItems(current, page.items))
+      if (page.tags.length > 0) setTags(page.tags)
       setTotal(page.total)
       setNextCursor(page.nextCursor)
     } catch (fetchError) {
@@ -86,7 +85,7 @@ export function useInfiniteList<T extends { id: number }>(
       loadingMoreRef.current = false
       setLoadingMore(false)
     }
-  }, [fetchPage, loading, nextCursor])
+  }, [fetchPage, items.length, loading, nextCursor])
 
   const replaceItem = useCallback((updated: T) => {
     setItems((current) =>
@@ -103,7 +102,7 @@ export function useInfiniteList<T extends { id: number }>(
     items,
     tags,
     total,
-    hasMore: nextCursor != null,
+    hasMore: nextCursor != null && items.length < MAX_RETAINED_ITEMS,
     loading,
     loadingMore,
     error,

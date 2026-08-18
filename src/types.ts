@@ -10,9 +10,11 @@ export type SummaryEntryRow = {
   status: 'pending' | 'complete' | 'error'
   skip_backfill: number
   error_message: string | null
-  summary_text: string | null
-  transcript_text: string | null
+  summary_text?: string | null
+  transcript_text?: string | null
   transcript_error: string | null
+  has_summary: boolean
+  has_transcript: boolean
   notebooklm_url: string | null
   notebooklm_links: NotebookLink[]
   last_viewed: string | null
@@ -51,6 +53,7 @@ export type BookmarkRow = {
   folder_path: string
   chrome_profile: string
   summary_text: string | null
+  summary_overflow?: boolean
   summary_status: 'pending' | 'complete' | 'error'
   summary_error: string | null
   notebooklm_url: string | null
@@ -74,7 +77,8 @@ export type LinkedInSavedItemRow = {
   author_headline: string | null
   title: string | null
   content_text: string | null
-  raw_metadata: Record<string, unknown>
+  raw_metadata?: Record<string, unknown>
+  text_overflow?: boolean
   content_hash: string | null
   extracted_at: string | null
   capture_status: 'pending' | 'complete' | 'metadata_only' | 'error'

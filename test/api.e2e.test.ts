@@ -129,8 +129,11 @@ describe('notebook-garden API e2e', () => {
     expect(second.items).toHaveLength(1)
     expect(second.nextCursor).toBeNull()
     expect(second.items[0].video_id).toBe('abc123')
-    expect(second.items[0].transcript_text).toBe('Full transcript here')
-    expect(second.items[0].transcript_error).toBeNull()
+    expect(second.items[0].transcript_text).toBeUndefined()
+    expect(second.items[0].has_transcript).toBe(true)
+    expect(second.tags).toEqual([])
+    const detail = await (await request(app, 'http://localhost/api/entries/1')).json()
+    expect(detail.transcript_text).toBe('Full transcript here')
   })
 
   it('filters entries by search and tag', async () => {

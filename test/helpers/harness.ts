@@ -40,6 +40,7 @@ export function insertEntry(
     url: string
     status: string
     summary_text: string | null
+    transcript_text: string | null
     notebooklm_links: string
     notebooklm_url: string | null
     last_viewed: string | null
@@ -55,9 +56,9 @@ export function insertEntry(
     .prepare(
       `
     INSERT INTO summary_entries (
-      video_id, title, url, status, skip_backfill, summary_text,
+      video_id, title, url, status, skip_backfill, summary_text, transcript_text,
       notebooklm_url, notebooklm_links, last_viewed, pinned, tags, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `,
     )
     .run(
@@ -66,6 +67,7 @@ export function insertEntry(
       overrides.url ?? 'https://www.youtube.com/watch?v=abc123',
       overrides.status ?? 'complete',
       overrides.summary_text ?? 'Summary body',
+      overrides.transcript_text ?? null,
       overrides.notebooklm_url ?? null,
       overrides.notebooklm_links ?? '[]',
       overrides.last_viewed ?? null,

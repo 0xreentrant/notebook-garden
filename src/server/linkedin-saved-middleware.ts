@@ -3,6 +3,7 @@ import type { Connect } from 'vite'
 import { parseListPageQuery } from '../lib/list-page'
 import {
   listLinkedInSavedPage,
+  getLinkedInSaved,
   patchLinkedInSaved,
   softDeleteLinkedInSaved,
 } from './linkedin-saved-api'
@@ -20,6 +21,20 @@ export function linkedinSavedMiddleware(
   if (req.method === 'GET' && (pathname === '/' || pathname === '')) {
     try {
       sendJson(res, 200, listLinkedInSavedPage(parseListPageQuery(url.searchParams)))
+    } catch (error) {
+      sendJson(res, 500, { error: String(error) })
+    }
+    return
+  }
+
+  if (req.method === 'GET' && idMatch) {
+    try {
+      const result = getLinkedInSaved(Number(idMatch[1]))
+      if (!result.ok) {
+        sendJson(res, result.status, { error: result.error })
+        return
+      }
+      sendJson(res, 200, result.row)
     } catch (error) {
       sendJson(res, 500, { error: String(error) })
     }

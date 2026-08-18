@@ -22,6 +22,10 @@ export function decodeCursor(cursor: string | null): OffsetCursor | null {
   }
 }
 
+export function tagsForPage(cursor: string | null, load: () => string[]): string[] {
+  return cursor ? [] : load()
+}
+
 export function collectTagsFromRows(rows: { tags: string }[]): string[] {
   const set = new Set<string>()
   for (const row of rows) {

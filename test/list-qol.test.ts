@@ -11,6 +11,7 @@ import {
   BOOKMARK_PINS_AT_TOP_KEY,
   readBookmarkPinsAtTop,
 } from '../src/lib/bookmark-list'
+import { LIST_TEXT_PREVIEW_CHARS } from '../src/lib/list-page'
 import {
   createHarness,
   insertBookmark,
@@ -47,6 +48,104 @@ describe('3. Shared list QoL', () => {
     ).json()
     expect(second.items.map((e: { video_id: string }) => e.video_id)).toEqual(['a'])
     expect(second.nextCursor).toBeNull()
+    expect(second.tags).toEqual([])
+  })
+
+  it('omits summary and transcript bodies from list pages', async () => {
+    const transcript = 'T'.repeat(20_000)
+    const id = insertEntry(h.dbPath, {
+      video_id: 'fat',
+      title: 'Fat',
+      summary_text: 'S'.repeat(5_000),
+      transcript_text: transcript,
+      tags: '["soil"]',
+    })
+    insertEntry(h.dbPath, {
+      video_id: 'older',
+      title: 'Older',
+      created_at: '2025-01-01T00:00:00.000Z',
+    })
+    const page = await (await request(h.app, 'http://localhost/api/entries?limit=1')).json()
+    expect(page.items[0].transcript_text).toBeUndefined()
+    expect(page.items[0].summary_text).toBeUndefined()
+    expect(page.items[0].has_transcript).toBe(true)
+    expect(page.items[0].has_summary).toBe(true)
+    expect(page.tags).toEqual(['soil'])
+    expect(JSON.stringify(page).length).toBeLessThan(transcript.length)
+    const next = await (
+      await request(h.app, `http://localhost/api/entries?limit=1&cursor=${page.nextCursor}`)
+    ).json()
+    expect(next.tags).toEqual([])
+    const detail = await (await request(h.app, `http://localhost/api/entries/${id}`)).json()
+    expect(detail.transcript_text).toBe(transcript)
+  })
+
+  it('omits LinkedIn raw_metadata from list pages', async () => {
+    insertLinkedIn(h.dbPath, { title: 'Meta post', content_text: 'Hello' })
+    const sqlite = h.db()
+    sqlite.prepare(`UPDATE linkedin_saved_items SET raw_metadata = ?`).run(JSON.stringify({ huge: 'x'.repeat(5000) }))
+    sqlite.close()
+    const page = await (await request(h.app, 'http://localhost/api/linkedin-saved?limit=50')).json()
+    expect(page.items[0].raw_metadata).toBeUndefined()
+    expect(JSON.stringify(page)).not.toContain('huge')
+  })
+
+  it('serves the full bookmark summary by id when the list page truncated it', async () => {
+    const summary = 'B'.repeat(LIST_TEXT_PREVIEW_CHARS * 3)
+    const id = insertBookmark(h.dbPath, {
+      url: 'https://example.com/long',
+      title: 'Long',
+      summary_text: summary,
+      summary_status: 'complete',
+    })
+    const shortId = insertBookmark(h.dbPath, {
+      url: 'https://example.com/short',
+      title: 'Short',
+      summary_text: 'tiny',
+      summary_status: 'complete',
+    })
+
+    const page = await (await request(h.app, 'http://localhost/api/bookmarks?limit=50')).json()
+    const truncated = page.items.find((b: { id: number }) => b.id === id)
+    expect(truncated.summary_text).toHaveLength(LIST_TEXT_PREVIEW_CHARS)
+    expect(truncated.summary_overflow).toBe(true)
+    expect(page.items.find((b: { id: number }) => b.id === shortId).summary_overflow).toBe(false)
+
+    const detail = await (await request(h.app, `http://localhost/api/bookmarks/${id}`)).json()
+    expect(detail.summary_text).toBe(summary)
+  })
+
+  it('serves the full LinkedIn body and raw_metadata by id', async () => {
+    const content = 'L'.repeat(LIST_TEXT_PREVIEW_CHARS * 3)
+    const id = insertLinkedIn(h.dbPath, { title: 'Long post', content_text: content })
+
+    const page = await (await request(h.app, 'http://localhost/api/linkedin-saved?limit=50')).json()
+    expect(page.items[0].content_text).toHaveLength(LIST_TEXT_PREVIEW_CHARS)
+    expect(page.items[0].text_overflow).toBe(true)
+
+    const detail = await (await request(h.app, `http://localhost/api/linkedin-saved/${id}`)).json()
+    expect(detail.content_text).toBe(content)
+    expect(detail.raw_metadata).toEqual({})
+  })
+
+  it('rejects unknown, deleted, and non-numeric detail ids', async () => {
+    const entryId = insertEntry(h.dbPath, { video_id: 'del', title: 'Del' })
+    const bookmarkId = insertBookmark(h.dbPath, { url: 'https://example.com/del' })
+    const linkedinId = insertLinkedIn(h.dbPath, { title: 'Del post' })
+
+    for (const [resource, id] of [
+      ['entries', entryId],
+      ['bookmarks', bookmarkId],
+      ['linkedin-saved', linkedinId],
+    ] as const) {
+      expect((await request(h.app, `http://localhost/api/${resource}/${id}`)).status).toBe(200)
+      await request(h.app, `http://localhost/api/${resource}/${id}`, { method: 'DELETE' })
+      expect((await request(h.app, `http://localhost/api/${resource}/${id}`)).status).toBe(404)
+      expect((await request(h.app, `http://localhost/api/${resource}/999999`)).status).toBe(404)
+      expect((await request(h.app, `http://localhost/api/${resource}/not-a-number`)).status).toBe(
+        400,
+      )
+    }
   })
 
   it('searches with title/tags scopes', async () => {

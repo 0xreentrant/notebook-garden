@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3'
 import { getDbPath } from '../db/paths'
 import type { ListPage, ListPageQuery } from '../lib/list-page'
+import { LIST_TEXT_PREVIEW_CHARS } from '../lib/list-page'
 import {
   appendNotebookLink,
   parseNotebookLinks,
@@ -15,6 +16,7 @@ import {
   collectTagsFromRows,
   decodeCursor,
   encodeCursor,
+  tagsForPage,
   whereSql,
 } from './list-page'
 
@@ -24,6 +26,19 @@ export const LINKEDIN_COLUMNS = `
   raw_metadata, content_hash, extracted_at,
   capture_status, capture_error, enrichment_status, enrichment_error,
   summary_text, enrichment_model, enrichment_prompt_version, enriched_at,
+  notebooklm_url, notebooklm_links, last_viewed, pinned, tags,
+  created_at, updated_at, deleted_at
+`
+
+export const LINKEDIN_LIST_COLUMNS = `
+  id, linkedin_urn, item_type, linkedin_url, source_url,
+  author_name, author_url, author_headline, title,
+  substr(content_text, 1, ${LIST_TEXT_PREVIEW_CHARS}) as content_text,
+  substr(summary_text, 1, ${LIST_TEXT_PREVIEW_CHARS}) as summary_text,
+  (length(COALESCE(NULLIF(summary_text, ''), content_text, '')) > ${LIST_TEXT_PREVIEW_CHARS}) AS text_overflow,
+  content_hash, extracted_at,
+  capture_status, capture_error, enrichment_status, enrichment_error,
+  enrichment_model, enrichment_prompt_version, enriched_at,
   notebooklm_url, notebooklm_links, last_viewed, pinned, tags,
   created_at, updated_at, deleted_at
 `
@@ -39,7 +54,8 @@ export type RawLinkedInSavedRow = {
   author_headline: string | null
   title: string | null
   content_text: string | null
-  raw_metadata: string
+  raw_metadata?: string
+  text_overflow?: number
   content_hash: string | null
   extracted_at: string | null
   capture_status: 'pending' | 'complete' | 'metadata_only' | 'error'
@@ -81,18 +97,22 @@ function isNotebookLink(value: unknown): value is NotebookLink {
 
 export function formatLinkedInSavedRow(raw: RawLinkedInSavedRow) {
   const notebooklm_links = parseNotebookLinks(raw.notebooklm_links)
-  let raw_metadata: Record<string, unknown> = {}
-  try {
-    raw_metadata = JSON.parse(raw.raw_metadata || '{}') as Record<string, unknown>
-  } catch {
-    raw_metadata = {}
+  const { raw_metadata: rawMetadataJson, ...rest } = raw
+  let raw_metadata: Record<string, unknown> | undefined
+  if (rawMetadataJson != null) {
+    try {
+      raw_metadata = JSON.parse(rawMetadataJson || '{}') as Record<string, unknown>
+    } catch {
+      raw_metadata = {}
+    }
   }
   return {
-    ...raw,
+    ...rest,
     tags: parseTags(raw.tags),
     notebooklm_links,
     notebooklm_url: notebooklm_links.at(-1)?.url ?? raw.notebooklm_url,
-    raw_metadata,
+    text_overflow: Boolean(raw.text_overflow),
+    ...(raw_metadata ? { raw_metadata } : {}),
   }
 }
 
@@ -131,16 +151,18 @@ export function listLinkedInSavedPage(
         .get(...filters.values) as { count: number }
     ).count
 
-    const tags = collectTagsFromRows(
-      db
-        .prepare(`SELECT tags FROM linkedin_saved_items WHERE deleted_at IS NULL`)
-        .all() as { tags: string }[],
+    const tags = tagsForPage(query.cursor, () =>
+      collectTagsFromRows(
+        db
+          .prepare(`SELECT tags FROM linkedin_saved_items WHERE deleted_at IS NULL`)
+          .all() as { tags: string }[],
+      ),
     )
 
     const rows = db
       .prepare(
         `
-      SELECT ${LINKEDIN_COLUMNS}
+      SELECT ${LINKEDIN_LIST_COLUMNS}
       FROM linkedin_saved_items
       ${where}
       ORDER BY ${orderBy}
@@ -263,13 +285,32 @@ export function patchLinkedInSaved(id: number, payload: LinkedInSavedPatchPayloa
     const row = db
       .prepare(
         `
-      SELECT ${LINKEDIN_COLUMNS}
+      SELECT ${LINKEDIN_LIST_COLUMNS}
       FROM linkedin_saved_items
       WHERE id = ?
     `,
       )
       .get(id) as RawLinkedInSavedRow
 
+    return { ok: true as const, row: formatLinkedInSavedRow(row) }
+  } finally {
+    db.close()
+  }
+}
+
+export function getLinkedInSaved(id: number) {
+  const db = openDb(true)
+  try {
+    const row = db
+      .prepare(
+        `
+      SELECT ${LINKEDIN_COLUMNS}
+      FROM linkedin_saved_items
+      WHERE id = ? AND deleted_at IS NULL
+    `,
+      )
+      .get(id) as RawLinkedInSavedRow | undefined
+    if (!row) return { ok: false as const, status: 404, error: 'LinkedIn item not found' }
     return { ok: true as const, row: formatLinkedInSavedRow(row) }
   } finally {
     db.close()
