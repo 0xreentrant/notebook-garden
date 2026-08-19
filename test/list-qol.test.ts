@@ -115,6 +115,33 @@ describe('3. Shared list QoL', () => {
     expect(detail.summary_text).toBe(summary)
   })
 
+  it('omits failed bookmark summaries from list and detail payloads', async () => {
+    const leak = 'should-not-leak-failed-summary'
+    const dump = 'HTTP Error 404: Not Found dump'
+    const id = insertBookmark(h.dbPath, {
+      url: 'https://example.com/failed-summary',
+      title: 'Failed summary',
+      summary_text: leak,
+      summary_status: 'error',
+    })
+    const db = h.db()
+    db.prepare(`UPDATE bookmarks SET summary_error = ? WHERE id = ?`).run(dump, id)
+    db.close()
+
+    const page = await (await request(h.app, 'http://localhost/api/bookmarks?limit=50')).json()
+    const item = page.items.find((b: { id: number }) => b.id === id)
+    expect(item.summary_text).toBeNull()
+    expect(item.summary_error).toBeNull()
+    expect(JSON.stringify(page)).not.toContain(leak)
+    expect(JSON.stringify(page)).not.toContain(dump)
+
+    const detail = await (await request(h.app, `http://localhost/api/bookmarks/${id}`)).json()
+    expect(detail.summary_text).toBeNull()
+    expect(detail.summary_error).toBeNull()
+    expect(JSON.stringify(detail)).not.toContain(leak)
+    expect(JSON.stringify(detail)).not.toContain(dump)
+  })
+
   it('serves the full LinkedIn body and raw_metadata by id', async () => {
     const content = 'L'.repeat(LIST_TEXT_PREVIEW_CHARS * 3)
     const id = insertLinkedIn(h.dbPath, { title: 'Long post', content_text: content })
