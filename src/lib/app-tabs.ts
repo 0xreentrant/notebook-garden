@@ -1,9 +1,9 @@
-export const HOME_PATH = '/summaries'
+export const HOME_PATH = '/youtube'
 
 export const APP_TABS = [
   {
-    path: '/summaries',
-    label: 'Summaries',
+    path: '/youtube',
+    label: 'YouTube',
     description: 'Create notebooks from YouTube summaries',
   },
   {
