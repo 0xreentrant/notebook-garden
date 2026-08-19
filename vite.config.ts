@@ -2,34 +2,16 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import { reactRouter } from '@react-router/dev/vite'
 import { defineConfig, loadEnv, type PreviewServer, type ViteDevServer } from 'vite'
-import { entriesMiddleware } from './src/server/entries-middleware'
-import { bookmarksMiddleware } from './src/server/bookmarks-middleware'
-import { linkedinSavedMiddleware } from './src/server/linkedin-saved-middleware'
-import { notebooklmMiddleware } from './src/server/notebooklm-routes'
-import { notebooksApiMiddleware } from './src/server/notebooks-api'
-import { metaAnalysisMiddleware } from './src/server/meta-analysis-middleware'
-import { settingsMiddleware } from './src/server/settings-middleware'
+import { apiMiddleware } from './src/server/api-middleware'
 
 function apiPlugin() {
   return {
     name: 'notebook-garden-api',
     configureServer(server: ViteDevServer) {
-      server.middlewares.use('/api/entries', entriesMiddleware)
-      server.middlewares.use('/api/bookmarks', bookmarksMiddleware)
-      server.middlewares.use('/api/linkedin-saved', linkedinSavedMiddleware)
-      server.middlewares.use('/api/notebooklm', notebooklmMiddleware)
-      server.middlewares.use('/api/notebooks', notebooksApiMiddleware)
-      server.middlewares.use('/api/meta-analysis', metaAnalysisMiddleware)
-      server.middlewares.use('/api/settings', settingsMiddleware)
+      server.middlewares.use(apiMiddleware)
     },
     configurePreviewServer(server: PreviewServer) {
-      server.middlewares.use('/api/entries', entriesMiddleware)
-      server.middlewares.use('/api/bookmarks', bookmarksMiddleware)
-      server.middlewares.use('/api/linkedin-saved', linkedinSavedMiddleware)
-      server.middlewares.use('/api/notebooklm', notebooklmMiddleware)
-      server.middlewares.use('/api/notebooks', notebooksApiMiddleware)
-      server.middlewares.use('/api/meta-analysis', metaAnalysisMiddleware)
-      server.middlewares.use('/api/settings', settingsMiddleware)
+      server.middlewares.use(apiMiddleware)
     },
   }
 }
