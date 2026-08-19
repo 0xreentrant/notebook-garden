@@ -33,9 +33,11 @@ export const BOOKMARK_COLUMNS = `
 
 export const BOOKMARK_LIST_COLUMNS = `
   id, url, title, folder_path, chrome_profile,
-  substr(summary_text, 1, ${LIST_TEXT_PREVIEW_CHARS}) as summary_text,
-  (length(COALESCE(summary_text, '')) > ${LIST_TEXT_PREVIEW_CHARS}) AS summary_overflow,
-  summary_status, summary_error,
+  CASE WHEN summary_status = 'complete'
+    THEN substr(summary_text, 1, ${LIST_TEXT_PREVIEW_CHARS})
+  END as summary_text,
+  (summary_status = 'complete' AND length(COALESCE(summary_text, '')) > ${LIST_TEXT_PREVIEW_CHARS}) AS summary_overflow,
+  summary_status,
   notebooklm_url, notebooklm_links, last_viewed, pinned, tags,
   created_at, updated_at, deleted_at
 `
@@ -81,12 +83,15 @@ function isNotebookLink(value: unknown): value is NotebookLink {
 
 export function formatBookmarkRow(raw: RawBookmarkRow) {
   const notebooklm_links = parseNotebookLinks(raw.notebooklm_links)
+  const complete = raw.summary_status === 'complete'
   return {
     ...raw,
     tags: parseTags(raw.tags),
     notebooklm_links,
     notebooklm_url: notebooklm_links.at(-1)?.url ?? raw.notebooklm_url,
-    summary_overflow: Boolean(raw.summary_overflow),
+    summary_overflow: complete && Boolean(raw.summary_overflow),
+    summary_text: complete ? raw.summary_text : null,
+    summary_error: null,
   }
 }
 

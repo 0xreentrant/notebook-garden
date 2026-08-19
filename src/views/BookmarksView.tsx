@@ -108,7 +108,9 @@ const BookmarkCard = memo(function BookmarkCard({
   const [tagInputOpen, setTagInputOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [fullSummary, setFullSummary] = useState<string | null>(null)
-  const summary = fullSummary ?? bookmark.summary_text ?? ''
+  const summary = bookmark.summary_status === 'complete'
+    ? (fullSummary ?? bookmark.summary_text ?? '')
+    : ''
   const summaryOverflow = Boolean(bookmark.summary_overflow) || (
     fullSummary != null && fullSummary.length > (bookmark.summary_text?.length ?? 0)
   )
@@ -386,10 +388,6 @@ const BookmarkCard = memo(function BookmarkCard({
               </Button>
             ) : null}
           </>
-        ) : bookmark.summary_status === 'error' ? (
-          <p className="text-sm text-muted-foreground">
-            Summary failed{bookmark.summary_error ? `: ${bookmark.summary_error}` : '.'}
-          </p>
         ) : null}
         <div className="flex flex-wrap items-center gap-2">
           {bookmark.notebooklm_links.length === 0 ? (

@@ -6,6 +6,7 @@ for a markdown summary. Writes summary_text / summary_status on bookmarks.
 
   python3 scripts/generate-bookmark-summaries.py --limit 5
   python3 scripts/generate-bookmark-summaries.py --ids 12,34
+  python3 scripts/generate-bookmark-summaries.py --retry-errors
   python3 scripts/generate-bookmark-summaries.py --sleep 30   # slow backfill
   python3 scripts/generate-bookmark-summaries.py --self-check
 """
@@ -66,6 +67,15 @@ def html_to_text(html: str) -> str:
     return re.sub(r"\s+", " ", " ".join(parser.chunks)).strip()
 
 
+# ponytail: Python 3.10 urllib has no http_error_308; 3.11+ does. Drop this subclass after the runtime is 3.11+.
+class Redirect308(urllib.request.HTTPRedirectHandler):
+    def http_error_308(self, req, fp, code, msg, hdrs):
+        return self.http_error_302(req, fp, code, msg, hdrs)
+
+
+_opener = urllib.request.build_opener(Redirect308)
+
+
 def fetch_page_text(url: str) -> str:
     if not url.startswith(("http://", "https://")):
         raise RuntimeError(f"unsupported scheme: {url.split(':', 1)[0]}")
@@ -74,7 +84,7 @@ def fetch_page_text(url: str) -> str:
         "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
         "Accept-Encoding": "gzip",
     })
-    with urllib.request.urlopen(req, timeout=FETCH_TIMEOUT) as resp:
+    with _opener.open(req, timeout=FETCH_TIMEOUT) as resp:
         ctype = resp.headers.get_content_type()
         if not (ctype.startswith("text/") or ctype.endswith("xml")):
             raise RuntimeError(f"non-text content-type: {ctype}")
@@ -119,7 +129,12 @@ def run_cursor_agent(prompt: str, model: str) -> str:
     return text
 
 
-def select_rows(conn: sqlite3.Connection, ids: list[int], limit: int) -> list[dict]:
+def select_rows(
+    conn: sqlite3.Connection,
+    ids: list[int],
+    limit: int,
+    retry_errors: bool = False,
+) -> list[dict]:
     if ids:
         marks = ",".join("?" * len(ids))
         sql = f"""
@@ -129,12 +144,14 @@ def select_rows(conn: sqlite3.Connection, ids: list[int], limit: int) -> list[di
         """
         rows = conn.execute(sql, ids).fetchall()
     else:
+        status = "error" if retry_errors else "pending"
         rows = conn.execute(
             """
             SELECT id, url, title, folder_path FROM bookmarks
-            WHERE deleted_at IS NULL AND summary_status = 'pending'
+            WHERE deleted_at IS NULL AND summary_status = ?
             ORDER BY created_at DESC, id DESC
-            """
+            """,
+            (status,),
         ).fetchall()
     rows = [dict(r) for r in rows]
     return rows[:limit] if limit > 0 else rows
@@ -194,6 +211,8 @@ def self_check() -> int:
     save_error(conn, 1, "boom")
     row = conn.execute("SELECT summary_status, summary_error FROM bookmarks WHERE id = 1").fetchone()
     assert (row["summary_status"], row["summary_error"]) == ("error", "boom")
+    assert [r["id"] for r in select_rows(conn, [], 0)] == []
+    assert [r["id"] for r in select_rows(conn, [], 0, retry_errors=True)] == [1]
 
     try:
         fetch_page_text("chrome://settings")
@@ -210,6 +229,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--ids", default="", help="Comma-separated bookmark ids (e.g. from a sync)")
+    parser.add_argument(
+        "--retry-errors",
+        action="store_true",
+        help="Summarize rows with summary_status=error instead of pending",
+    )
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--sleep", type=float, default=3.0, help="Seconds between items")
     parser.add_argument("--model", default="auto")
@@ -223,7 +247,7 @@ def main() -> int:
     ids = [int(x) for x in args.ids.split(",") if x.strip()]
     conn = sqlite3.connect(args.db)
     conn.row_factory = sqlite3.Row
-    rows = select_rows(conn, ids, args.limit)
+    rows = select_rows(conn, ids, args.limit, retry_errors=args.retry_errors)
     print(f"Summarizing {len(rows)} bookmarks (dry_run={args.dry_run})", file=sys.stderr)
 
     ok = 0
