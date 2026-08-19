@@ -689,7 +689,7 @@ function TagAccordion({
   )
 }
 
-export default function SummariesView() {
+export default function YouTubeView() {
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [notebookFilter, setNotebookFilter] = useState<NotebookFilter>('all')

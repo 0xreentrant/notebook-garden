@@ -1,6 +1,12 @@
-import type { Route } from './+types/summaries'
-import SummariesView from '@/views/SummariesView'
+import { redirect } from 'react-router'
+import { HOME_PATH } from '@/lib/app-tabs'
 
-export default function SummariesRoute(_props: Route.ComponentProps) {
-  return <SummariesView />
+export function clientLoader() {
+  return redirect(HOME_PATH)
+}
+
+clientLoader.hydrate = true as const
+
+export default function SummariesRedirectRoute() {
+  return null
 }

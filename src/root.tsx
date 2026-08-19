@@ -8,7 +8,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from 'react-router'
-import { BookmarkIcon, BookOpenIcon, LinkIcon, SparklesIcon, SproutIcon } from 'lucide-react'
+import { BookmarkIcon, BookOpenIcon, LinkIcon, SparklesIcon } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { fetchSettings } from '@/api/settings'
 import MetaAnalysisModal from '@/components/MetaAnalysisModal'
@@ -18,8 +18,16 @@ import { APP_TABS, type AppTabPath } from '@/lib/app-tabs'
 import { writeObsidianVault } from '@/lib/settings'
 import { cn } from '@/lib/utils'
 
-const TAB_ICONS: Record<AppTabPath, LucideIcon> = {
-  '/summaries': SproutIcon,
+function YouTubeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M23.5 6.2a3.05 3.05 0 0 0-2.15-2.16C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.35.44A3.05 3.05 0 0 0 .5 6.2 31.9 31.9 0 0 0 0 12a31.9 31.9 0 0 0 .5 5.8 3.05 3.05 0 0 0 2.15 2.16C4.5 20.4 12 20.4 12 20.4s7.5 0 9.35-.44a3.05 3.05 0 0 0 2.15-2.16A31.9 31.9 0 0 0 24 12a31.9 31.9 0 0 0-.5-5.8ZM9.6 15.6V8.4L15.6 12l-6 3.6Z" />
+    </svg>
+  )
+}
+
+const TAB_ICONS: Record<AppTabPath, LucideIcon | typeof YouTubeIcon> = {
+  '/youtube': YouTubeIcon,
   '/bookmarks': BookmarkIcon,
   '/linkedin': LinkIcon,
   '/notebooks': BookOpenIcon,

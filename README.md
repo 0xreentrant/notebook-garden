@@ -4,7 +4,7 @@ Unified local app for planting NotebookLM notebooks from YouTube summaries and t
 
 ## Views
 
-- **Summaries** - browse Ask summaries from `summaries.db`, create NotebookLM notebooks from videos.
+- **YouTube** (`/youtube`) - browse Ask summaries from `summaries.db`, create NotebookLM notebooks from videos. `/summaries` redirects here.
 - **Library** - sync, tag, pin, rename, and delete notebooks cached locally.
 
 ## Database
