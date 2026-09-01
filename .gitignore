@@ -14,3 +14,4 @@ build/
 *.local
 __pycache__/
 notebook-garden-settings.json
+logs/bookmark-summaries-backfill.log
