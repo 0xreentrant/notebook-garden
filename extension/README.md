@@ -5,7 +5,7 @@ Headless Chrome extension that creates one NotebookLM notebook per video when ca
 ## Prerequisites
 
 1. Google Chrome
-2. Logged into [NotebookLM](https://notebooklm.google.com) in the same Chrome profile where you load this extension
+2. Logged into [NotebookLM](https://notebook.google.com) in the same Chrome profile where you load this extension
 
 ## Install (unpacked)
 
@@ -30,7 +30,7 @@ No extension popup or icon - the extension only responds to messages from notebo
 ## Troubleshooting
 
 - **"Could not establish connection"** - extension not loaded, or wrong extension ID
-- **"Please login to NotebookLM first"** - open notebooklm.google.com in Chrome and sign in
+- **"Please login to NotebookLM first"** - open https://notebook.google.com in Chrome and sign in
 - **"Origin not allowed"** - notebook-garden must run on `localhost` or `127.0.0.1`
 
 ## E2e tests
@@ -51,7 +51,7 @@ Pinned in `background.js` (keep in sync with `scripts/notebooklm-rpc-e2e.py`):
 | Constant | RPC ID | Purpose |
 |----------|--------|---------|
 | `RPC_CREATE` | `CCqFvf` | Create notebook |
-| `RPC_ADD_SOURCES` | `izAoDd` | Add YouTube source |
+| `RPC_ADD_SOURCES` | `izAoDd` | Add URL source (YouTube at [7], web at [2]) |
 | `RPC_LIST` | `wXbhsf` | List notebooks |
 
 ## Commands

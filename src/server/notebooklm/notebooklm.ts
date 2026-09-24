@@ -1,5 +1,15 @@
 // RPC IDs - keep in sync with extension/background.js
-export const NOTEBOOKLM_BASE_URL = 'https://notebooklm.google.com'
+export const DEFAULT_NOTEBOOKLM_BASE_URL = 'https://notebook.google.com'
+
+export function resolveNotebooklmBaseUrl(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const raw = env.NOTEBOOKLM_BASE_URL?.trim()
+  if (!raw) return DEFAULT_NOTEBOOKLM_BASE_URL
+  return raw.replace(/\/+$/, '')
+}
+
+export const NOTEBOOKLM_BASE_URL = resolveNotebooklmBaseUrl()
 export const BATCHEXECUTE_URL = `${NOTEBOOKLM_BASE_URL}/_/LabsTailwindUi/data/batchexecute`
 export const NOTEBOOK_URL_PREFIX = `${NOTEBOOKLM_BASE_URL}/notebook/`
 
@@ -254,6 +264,30 @@ export async function createNotebookViaApi(
   return notebooklmId
 }
 
+/** NotebookLM izAoDd: YouTube URL at [7], web URL at [2]. */
+export function isYouTubeUrl(url: string): boolean {
+  let host: string
+  try {
+    host = new URL(url).hostname.toLowerCase()
+  } catch {
+    return false
+  }
+  return (
+    host === 'youtu.be' ||
+    host === 'youtube.com' ||
+    host.endsWith('.youtube.com') ||
+    host === 'youtube-nocookie.com' ||
+    host.endsWith('.youtube-nocookie.com')
+  )
+}
+
+export function buildAddSourceSpec(url: string): unknown[] {
+  if (isYouTubeUrl(url)) {
+    return [null, null, null, null, null, null, null, [url]]
+  }
+  return [null, null, [url]]
+}
+
 export async function addYouTubeSourceViaApi(
   cookie: string,
   notebookId: string,
@@ -267,7 +301,7 @@ export async function addYouTubeSourcesViaApi(
   notebookId: string,
   urls: string[],
 ): Promise<void> {
-  const sources = urls.map((url) => [null, null, null, null, null, null, null, [url]])
+  const sources = urls.map(buildAddSourceSpec)
   await rpcCall(cookie, RPC_ADD_SOURCES, [sources, notebookId], `/notebook/${notebookId}`)
 }
 
