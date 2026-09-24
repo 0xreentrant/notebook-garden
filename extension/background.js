@@ -1,11 +1,12 @@
-// RPC IDs — keep in sync with src/server/notebooklm/notebooklm.ts
+// RPC IDs - keep in sync with src/server/notebooklm/notebooklm.ts
 const RPC_CREATE = 'CCqFvf'
 const RPC_ADD_SOURCES = 'izAoDd'
 const RPC_LIST = 'wXbhsf'
 const RPC_RENAME = 's0tc2d'
 const RPC_DELETE = 'WWINqb'
 
-const BASE_URL = 'https://notebooklm.google.com'
+// Changeable - must match server NOTEBOOKLM_BASE_URL (default https://notebook.google.com)
+const BASE_URL = 'https://notebook.google.com'
 const NOTEBOOK_URL_PREFIX = `${BASE_URL}/notebook/`
 
 const ALLOWED_ORIGIN_PREFIXES = [
@@ -239,9 +240,32 @@ async function createNotebook(title) {
   return uuidMatch[0]
 }
 
-async function addYouTubeSource(notebookId, url) {
-  const source = [null, null, null, null, null, null, null, [url]]
-  await rpc(RPC_ADD_SOURCES, [[source], notebookId], `/notebook/${notebookId}`)
+function isYouTubeUrl(url) {
+  let host
+  try {
+    host = new URL(url).hostname.toLowerCase()
+  } catch {
+    return false
+  }
+  return (
+    host === 'youtu.be' ||
+    host === 'youtube.com' ||
+    host.endsWith('.youtube.com') ||
+    host === 'youtube-nocookie.com' ||
+    host.endsWith('.youtube-nocookie.com')
+  )
+}
+
+function buildAddSourceSpec(url) {
+  // NotebookLM izAoDd: YouTube URL at [7], web URL at [2].
+  if (isYouTubeUrl(url)) {
+    return [null, null, null, null, null, null, null, [url]]
+  }
+  return [null, null, [url]]
+}
+
+async function addUrlSource(notebookId, url) {
+  await rpc(RPC_ADD_SOURCES, [[buildAddSourceSpec(url)], notebookId], `/notebook/${notebookId}`)
 }
 
 function isAllowedOrigin(origin) {
@@ -252,7 +276,7 @@ async function createAndImport(title, url) {
   tokens = null
   await getTokens()
   const notebookId = await createNotebook(title)
-  await addYouTubeSource(notebookId, url)
+  await addUrlSource(notebookId, url)
   return {
     success: true,
     notebookId,
