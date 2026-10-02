@@ -75,9 +75,9 @@ describe('4. Bookmarks-specific QoL', () => {
       pinned: 1,
       tags: '["keep"]',
       notebooklm_links: JSON.stringify([
-        { url: 'https://notebooklm.google.com/notebook/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', title: 'N' },
+        { url: 'https://notebook.google.com/notebook/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', title: 'N' },
       ]),
-      notebooklm_url: 'https://notebooklm.google.com/notebook/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      notebooklm_url: 'https://notebook.google.com/notebook/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       summary_text: 'Kept summary',
       summary_status: 'complete',
       created_at: '2024-01-01T00:00:00.000Z',

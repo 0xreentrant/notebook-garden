@@ -154,7 +154,7 @@ export function insertNotebook(
     .run(
       id,
       overrides.title ?? 'Notebook',
-      overrides.url ?? `https://notebooklm.google.com/notebook/${id}`,
+      overrides.url ?? `https://notebook.google.com/notebook/${id}`,
       overrides.last_viewed ?? null,
       overrides.pinned ?? 0,
       overrides.tags ?? '[]',
@@ -220,5 +220,5 @@ export function insertLinkedIn(
 }
 
 export function notebookUrl(id: string) {
-  return `https://notebooklm.google.com/notebook/${id}`
+  return `https://notebook.google.com/notebook/${id}`
 }

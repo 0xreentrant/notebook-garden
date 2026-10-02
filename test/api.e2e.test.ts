@@ -77,7 +77,7 @@ function seedDb() {
     VALUES (
       '00000000-0000-4000-8000-000000000001',
       'Garden notebook',
-      'https://notebooklm.google.com/notebook/00000000-0000-4000-8000-000000000001',
+      'https://notebook.google.com/notebook/00000000-0000-4000-8000-000000000001',
       2,
       '2026-01-02T00:00:00Z'
     );

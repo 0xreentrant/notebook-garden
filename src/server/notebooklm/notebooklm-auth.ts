@@ -3,11 +3,12 @@ import {
   formatCookieHeader,
   readProfileCookieHeader,
 } from './notebooklm-login'
+import { NOTEBOOKLM_BASE_URL } from './notebooklm'
 
 export { formatCookieHeader }
 
 export const NOTEBOOKLM_AUTH_ERROR =
-  'Not logged into NotebookLM. Log into notebooklm.google.com in the Playwright profile (YT_PROFILE_DIR), or set NOTEBOOKLM_COOKIE.'
+  `Not logged into NotebookLM. Log into ${NOTEBOOKLM_BASE_URL} in the Playwright profile (YT_PROFILE_DIR), or set NOTEBOOKLM_COOKIE.`
 
 let cachedCookie: string | null = null
 let refreshPromise: Promise<string> | null = null
@@ -18,7 +19,7 @@ export function invalidateNotebooklmCookieCache() {
 
 function isAuthError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
-  return /not authorized|NOTEBOOKLM_COOKIE|login to NotebookLM|Not logged into NotebookLM/i.test(message)
+  return /not authorized|NOTEBOOKLM_COOKIE|login to NotebookLM|Not logged into NotebookLM|Failed to fetch NotebookLM page/i.test(message)
 }
 
 async function exportCookieFromProfile(allowHeadedLogin = true): Promise<string> {

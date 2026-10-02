@@ -5,8 +5,11 @@ import {
   useEffect,
   useMemo,
   useState,
+  type ComponentProps,
   type FormEvent,
 } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   BookOpenIcon,
   ExternalLinkIcon,
@@ -79,6 +82,14 @@ const fieldClassName =
   'h-8 w-full rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 const checkboxClassName = 'size-3.5 shrink-0 rounded border-border accent-primary'
+
+const markdownComponents = {
+  a: ({ href, children, ...props }: ComponentProps<'a'>) => (
+    <a {...props} href={href} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  ),
+}
 
 const BookmarkCard = memo(function BookmarkCard({
   bookmark,
@@ -374,8 +385,10 @@ const BookmarkCard = memo(function BookmarkCard({
       <CardContent className="space-y-3 border-t pt-4">
         {summary ? (
           <>
-            <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-              {summaryOpen ? summary : summary.slice(0, 420)}
+            <div className="markdown-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {summaryOpen ? summary : summary.slice(0, 420)}
+              </ReactMarkdown>
             </div>
             {summaryOverflow ? (
               <Button

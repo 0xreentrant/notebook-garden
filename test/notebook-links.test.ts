@@ -16,20 +16,20 @@ describe('notebook links', () => {
 
   it('appends unique links and updates title on duplicate url', () => {
     const first = appendNotebookLink([], {
-      url: 'https://notebooklm.google.com/notebook/a',
+      url: 'https://notebook.google.com/notebook/a',
       title: 'Alpha',
     })
     const second = appendNotebookLink(first, {
-      url: 'https://notebooklm.google.com/notebook/b',
+      url: 'https://notebook.google.com/notebook/b',
       title: 'Beta',
     })
     const updated = appendNotebookLink(second, {
-      url: 'https://notebooklm.google.com/notebook/a',
+      url: 'https://notebook.google.com/notebook/a',
       title: 'Alpha renamed',
     })
     expect(updated).toEqual([
-      { url: 'https://notebooklm.google.com/notebook/a', title: 'Alpha renamed' },
-      { url: 'https://notebooklm.google.com/notebook/b', title: 'Beta' },
+      { url: 'https://notebook.google.com/notebook/a', title: 'Alpha renamed' },
+      { url: 'https://notebook.google.com/notebook/b', title: 'Beta' },
     ])
     expect(parseNotebookLinks(serializeNotebookLinks(updated))).toEqual(updated)
   })

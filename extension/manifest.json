@@ -8,6 +8,7 @@
     "service_worker": "background.js"
   },
   "host_permissions": [
+    "https://notebook.google.com/*",
     "https://notebooklm.google.com/*"
   ],
   "externally_connectable": {

@@ -17,8 +17,9 @@ import {
   tagsForPage,
   whereSql,
 } from './list-page'
+import { NOTEBOOK_URL_PREFIX } from './notebooklm/notebooklm'
 
-export const NOTEBOOKLM_URL_PREFIX = 'https://notebooklm.google.com/notebook/'
+export const NOTEBOOKLM_URL_PREFIX = NOTEBOOK_URL_PREFIX
 
 export const ENTRY_COLUMNS = `
   id, video_id, title, url, status, skip_backfill,
@@ -185,7 +186,7 @@ export function patchEntry(id: number, payload: EntryPatchPayload) {
       return {
         ok: false as const,
         status: 400,
-        error: 'notebooklm_url must start with https://notebooklm.google.com/notebook/',
+        error: `notebooklm_url must start with ${NOTEBOOKLM_URL_PREFIX}`,
       }
     }
     linkToAppend = {
