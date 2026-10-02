@@ -85,6 +85,13 @@
       "when": 1783700000000,
       "tag": "0011_bookmark_summaries",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1783800000000,
+      "tag": "0012_notebook_google_host",
+      "breakpoints": true
     }
   ]
 }

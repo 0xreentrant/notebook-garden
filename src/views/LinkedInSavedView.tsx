@@ -1,4 +1,6 @@
-import { memo, useMemo, useState } from 'react'
+import { memo, useMemo, useState, type ComponentProps } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   BookOpenIcon,
   CopyIcon,
@@ -41,6 +43,14 @@ import type { LinkedInSavedItemRow } from '@/types'
 
 const fieldClassName =
   'h-8 w-full rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
+
+const markdownComponents = {
+  a: ({ href, children, ...props }: ComponentProps<'a'>) => (
+    <a {...props} href={href} target="_blank" rel="noreferrer">
+      {children}
+    </a>
+  ),
+}
 
 function plantUrl(item: LinkedInSavedItemRow) {
   if (item.item_type === 'article' && item.source_url) return item.source_url
@@ -170,8 +180,10 @@ const LinkedInCard = memo(function LinkedInCard({
           {item.author_name ? <span>{item.author_name}</span> : null}
         </div>
         {body ? (
-          <div className="whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-            {open ? body : body.slice(0, 420)}
+          <div className="markdown-body">
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {open ? body : body.slice(0, 420)}
+            </ReactMarkdown>
           </div>
         ) : (
           <p className="text-muted-foreground">No captured text.</p>

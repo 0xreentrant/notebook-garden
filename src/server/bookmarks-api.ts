@@ -285,7 +285,7 @@ export function patchBookmark(id: number, payload: BookmarkPatchPayload) {
       return {
         ok: false as const,
         status: 400,
-        error: 'notebooklm_url must start with https://notebooklm.google.com/notebook/',
+        error: `notebooklm_url must start with ${NOTEBOOKLM_URL_PREFIX}`,
       }
     }
     linkToAppend = {
