@@ -1,6 +1,7 @@
 summaries.db
 summaries.db-wal
 summaries.db-shm
+summaries.db.corrupt-*
 test-app-e2e.db
 test-app-e2e.db-wal
 test-app-e2e.db-shm

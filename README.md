@@ -9,7 +9,15 @@ Unified local app for planting NotebookLM notebooks from YouTube summaries and t
 
 ## Database
 
-Single SQLite file: `summaries.db` (override with `APP_DB`).
+Local SQLite file: `summaries.db` (override with `APP_DB`). A clone does not include it. `npm run db:migrate` creates an empty one.
+
+Backups of your real database go to the private repo `0xreentrant/notebook-garden-db` (override with `DB_BACKUP_REPO`):
+
+```bash
+scripts/backup-db.sh
+```
+
+Restore by copying that repo's `summaries.db` into this directory.
 
 Python Watch Later scripts live in `~/.cursor/skills/youtube-ask-summarize/scripts/`. Point them at this DB:
 
@@ -20,10 +28,11 @@ python3 scripts/yt-headless-batch.py --db ~/projects/dreams/notebook-garden/summ
 
 ## Setup
 
+New machine, including an agent doing the setup: follow [AGENTS.md](AGENTS.md).
+
 ```bash
-npm install
+npm ci
 npm run db:migrate
-npm run db:import-notebooks   # optional: import notebooks from backup local.db
 npm run dev
 ```
 
