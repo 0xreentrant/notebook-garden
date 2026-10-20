@@ -34,6 +34,7 @@ describe('applyMigrations', () => {
         'bookmarks',
         'meta_analyses',
         'linkedin_saved_items',
+        'reddit_saved_items',
       ]))
       expect(count.n).toBe(1)
     } finally {

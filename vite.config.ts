@@ -20,6 +20,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   if (env.NOTEBOOKLM_COOKIE) process.env.NOTEBOOKLM_COOKIE = env.NOTEBOOKLM_COOKIE
   if (env.NOTEBOOKLM_BASE_URL) process.env.NOTEBOOKLM_BASE_URL = env.NOTEBOOKLM_BASE_URL
+  if (env.REDDIT_CLIENT_ID) process.env.REDDIT_CLIENT_ID = env.REDDIT_CLIENT_ID
+  if (env.REDDIT_CLIENT_SECRET) process.env.REDDIT_CLIENT_SECRET = env.REDDIT_CLIENT_SECRET
+  if (env.REDDIT_USER_AGENT) process.env.REDDIT_USER_AGENT = env.REDDIT_USER_AGENT
+  if (env.REDDIT_TOKEN_PATH) process.env.REDDIT_TOKEN_PATH = env.REDDIT_TOKEN_PATH
+  if (env.REDDIT_REDIRECT_URI) process.env.REDDIT_REDIRECT_URI = env.REDDIT_REDIRECT_URI
 
   return {
     plugins: [reactRouter(), tailwindcss(), apiPlugin()],

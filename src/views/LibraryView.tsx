@@ -4,6 +4,7 @@ import {
   ChevronDownIcon,
   ExternalLinkIcon,
   Loader2Icon,
+  MergeIcon,
   PencilIcon,
   PinIcon,
   PlusIcon,
@@ -11,6 +12,7 @@ import {
   Trash2Icon,
   XIcon,
 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
   AlertDialog,
@@ -31,6 +33,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useNotebooks } from '@/hooks/useNotebooks'
+import { useTabSelection } from '@/hooks/useTabSelection'
 import { useInfiniteList } from '@/hooks/useInfiniteList'
 import { useThrottledValue } from '@/hooks/useThrottledValue'
 import {
@@ -48,12 +51,15 @@ import {
 } from '@/lib/notebook-list'
 import { normalizeTag } from '@/lib/tags'
 import { cn } from '@/lib/utils'
+import type { MergeSourcePreview, NotebookMergeReport } from '@/api/notebooks'
 import type { NotebookRow } from '@/types'
 
 const fieldClassName =
   'h-8 w-full rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 const checkboxClassName = 'size-3.5 shrink-0 rounded border-border accent-primary'
+
+const NOTEBOOK_SOURCE_CAP = 50
 
 // ponytail: floor so sub-second API syncs still show loading motion; upgrade = drop if latency rises
 const SYNC_MIN_ACTIVE_MS = 1000
@@ -544,7 +550,7 @@ function TagAccordion({
 }
 
 export default function LibraryView() {
-  const { sync, createNotebook, updateNotebook, renameNotebook, deleteNotebook } = useNotebooks()
+  const { sync, createNotebook, updateNotebook, renameNotebook, deleteNotebook, mergeNotebooks, previewMergeSources } = useNotebooks()
   const [sortKey, setSortKey] = useState<SortKey>('created_desc')
   const [viewFilter, setViewFilter] = useState<ViewFilter>('all')
   const [tagFilter, setTagFilter] = useState('all')
@@ -552,13 +558,40 @@ export default function LibraryView() {
   const [searchScope, setSearchScope] = useState<SearchScope>('all')
   const deferredFilterQuery = useDeferredValue(filterQuery)
   const [pinsAtTop, setPinsAtTop] = useState(readPinsAtTop)
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
   const [bulkTagOpen, setBulkTagOpen] = useState(false)
   const [bulkTagDraft, setBulkTagDraft] = useState('')
   const [bulkTagPending, setBulkTagPending] = useState(false)
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergeSelection, setMergeSelection] = useState<NotebookRow[]>([])
+  const [mergeDestinationId, setMergeDestinationId] = useState<number | null>(null)
+  const [mergeMode, setMergeMode] = useState<'existing' | 'new'>('existing')
+  const [mergeTitle, setMergeTitle] = useState('')
+  const [mergePending, setMergePending] = useState(false)
+  const [mergeError, setMergeError] = useState<string | null>(null)
+  const [mergeReport, setMergeReport] = useState<NotebookMergeReport | null>(null)
+  const [mergeChoices, setMergeChoices] = useState<MergeSourcePreview | null>(null)
+  const [mergeChoicesLoading, setMergeChoicesLoading] = useState(false)
+  const [mergeChoicesError, setMergeChoicesError] = useState<string | null>(null)
+  const [includedSourceKeys, setIncludedSourceKeys] = useState<Set<string>>(() => new Set())
+  const mergeListedSources = useMemo(
+    () => mergeSelection.reduce((sum, notebook) => sum + notebook.source_count, 0),
+    [mergeSelection],
+  )
+  const mergeOverCap = mergeListedSources > NOTEBOOK_SOURCE_CAP
+  const mergeCap = mergeChoices?.cap ?? NOTEBOOK_SOURCE_CAP
+  const mergeSelectedUrls = useMemo(() => {
+    if (!mergeChoices) return null
+    return mergeChoices.choices.flatMap((choice) =>
+      choice.role === 'add' && choice.url && includedSourceKeys.has(choice.key) ? [choice.url] : [],
+    )
+  }, [mergeChoices, includedSourceKeys])
+  const mergeProjectedSources = mergeChoices
+    ? mergeChoices.destinationSourceCount + (mergeSelectedUrls?.length ?? 0)
+    : mergeListedSources
+  const mergeSelectionOverCap = mergeProjectedSources > mergeCap
   const [createPending, setCreatePending] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [syncVisual, setSyncVisual] = useState<SyncVisual>('idle')
@@ -589,6 +622,12 @@ export default function LibraryView() {
     replaceItem,
     removeItem,
   } = useInfiniteList<NotebookRow>('/api/notebooks', listFilters)
+
+  const { selectedIds, toggleSelected, clearSelection, rememberSelection } = useTabSelection(
+    'notebooks',
+    notebooks,
+    loading,
+  )
 
   const [syncPending, setSyncPending] = useState(false)
   const isSyncing = syncPending
@@ -625,27 +664,6 @@ export default function LibraryView() {
   )
 
   const selectedCount = selectedIds.size
-
-  useEffect(() => {
-    const visibleIdSet = new Set(notebooks.map((n) => n.id))
-    setSelectedIds((prev) => {
-      const next = new Set([...prev].filter((id) => visibleIdSet.has(id)))
-      return next.size === prev.size ? prev : next
-    })
-  }, [notebooks])
-
-  const toggleSelected = useCallback((id: number, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (checked) next.add(id)
-      else next.delete(id)
-      return next
-    })
-  }, [])
-
-  function clearSelection() {
-    setSelectedIds(new Set())
-  }
 
   function selectedNotebooks() {
     return notebooks.filter((n) => selectedIds.has(n.id))
@@ -762,6 +780,116 @@ export default function LibraryView() {
     } finally {
       setBulkTagPending(false)
     }
+  }
+
+  function openMerge() {
+    const selected = selectedNotebooks()
+    if (selected.length < 2) return
+    const destination = selected.reduce((best, notebook) =>
+      notebook.source_count > best.source_count ? notebook : best,
+    )
+    setMergeSelection(selected)
+    setMergeDestinationId(destination.id)
+    setMergeMode('existing')
+    setMergeTitle('')
+    setMergeError(null)
+    setMergeReport(null)
+    setMergeChoices(null)
+    setMergeChoicesError(null)
+    setIncludedSourceKeys(new Set())
+    setMergeOpen(true)
+  }
+
+  useEffect(() => {
+    if (!mergeOpen || !mergeOverCap || mergeReport) return
+    const destinationId = mergeMode === 'existing'
+      ? mergeSelection.find((notebook) => notebook.id === mergeDestinationId)?.notebooklm_id
+      : undefined
+    let cancelled = false
+    setMergeChoices(null)
+    setIncludedSourceKeys(new Set())
+    setMergeChoicesLoading(true)
+    setMergeChoicesError(null)
+    void previewMergeSources({
+      sourceNotebooklmIds: mergeSelection.map((notebook) => notebook.notebooklm_id),
+      destinationNotebooklmId: destinationId,
+    }).then((preview) => {
+      if (cancelled) return
+      setMergeChoices(preview)
+      setIncludedSourceKeys(new Set(
+        preview.choices.flatMap((choice) => choice.role === 'add' ? [choice.key] : []),
+      ))
+    }).catch((error: unknown) => {
+      if (cancelled) return
+      setMergeChoices(null)
+      setMergeChoicesError(error instanceof Error ? error.message : String(error))
+    }).finally(() => {
+      if (!cancelled) setMergeChoicesLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [
+    mergeOpen,
+    mergeOverCap,
+    mergeReport,
+    mergeMode,
+    mergeDestinationId,
+    mergeSelection,
+    previewMergeSources,
+  ])
+
+  function toggleMergeSource(key: string) {
+    setIncludedSourceKeys((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  function mergeChoiceNote(role: MergeSourcePreview['choices'][number]['role']) {
+    if (role === 'destination') return 'already on destination'
+    if (role === 'duplicate') return 'duplicate'
+    if (role === 'no-url') return 'no URL to copy'
+    return null
+  }
+
+  async function confirmMerge(event: FormEvent) {
+    event.preventDefault()
+    if (mergeSelection.length < 2) return
+    const destination = mergeMode === 'existing'
+      ? mergeSelection.find((notebook) => notebook.id === mergeDestinationId)
+      : null
+    if (mergeMode === 'existing' && !destination) {
+      setMergeError('Choose a destination notebook')
+      return
+    }
+    if (mergeMode === 'new' && !mergeTitle.trim()) return
+    setMergePending(true)
+    setMergeError(null)
+    try {
+      const report = await mergeNotebooks({
+        sourceNotebooklmIds: mergeSelection.map((notebook) => notebook.notebooklm_id),
+        destinationNotebooklmId: destination?.notebooklm_id,
+        title: mergeMode === 'new' ? mergeTitle.trim() : undefined,
+        urls: mergeSelectedUrls ?? undefined,
+      })
+      setMergeReport(report)
+      if (mergeOverCap) rememberSelection()
+      else clearSelection()
+      await reload()
+    } catch (mergeErr) {
+      setMergeError(mergeErr instanceof Error ? mergeErr.message : String(mergeErr))
+      await reload()
+    } finally {
+      setMergePending(false)
+    }
+  }
+
+  function skipReasonLabel(reason: 'no-url' | 'duplicate') {
+    if (reason === 'duplicate') return 'duplicate URL'
+    return 'no URL to copy'
   }
 
   async function confirmBulkDelete() {
@@ -953,6 +1081,12 @@ export default function LibraryView() {
               <TagPlusIcon className="size-3.5" />
               Tag
             </Button>
+            {selectedCount >= 2 ? (
+              <Button variant="outline" size="sm" onClick={openMerge}>
+                <MergeIcon className="size-3.5" />
+                Merge
+              </Button>
+            ) : null}
             <Button
               variant="destructive"
               size="sm"
@@ -1061,6 +1195,174 @@ export default function LibraryView() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={mergeOpen}
+          onOpenChange={(open) => {
+            setMergeOpen(open)
+            if (!open) {
+              setMergeError(null)
+              setMergeReport(null)
+              if (mergeOverCap) rememberSelection()
+            }
+          }}
+        >
+          <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-lg">
+            {mergeReport ? (
+              <>
+                <DialogHeader>
+                  <DialogTitle>Merged into {mergeReport.destinationTitle}</DialogTitle>
+                  <DialogDescription>
+                    Added {mergeReport.addedCount}{' '}
+                    {mergeReport.addedCount === 1 ? 'source' : 'sources'}. The destination now has{' '}
+                    {mergeReport.sourceCount}{' '}
+                    {mergeReport.sourceCount === 1 ? 'source' : 'sources'}. The other notebooks were left in place.
+                  </DialogDescription>
+                </DialogHeader>
+                {mergeReport.skipped.length > 0 ? (
+                  <div className="flex max-h-48 flex-col gap-1 overflow-y-auto py-2 text-sm">
+                    <p className="text-muted-foreground">Skipped {mergeReport.skipped.length}</p>
+                    {mergeReport.skipped.map((source, index) => (
+                      <p key={`${source.reason}-${index}`}>
+                        {source.title ?? 'Untitled source'} - {skipReasonLabel(source.reason)}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                <DialogFooter>
+                  <DialogClose type="button">Close</DialogClose>
+                </DialogFooter>
+              </>
+            ) : (
+              <form onSubmit={(event) => void confirmMerge(event)}>
+                <DialogHeader>
+                  <DialogTitle>Merge {mergeSelection.length} notebooks</DialogTitle>
+                  <DialogDescription>
+                    Copies web and YouTube sources into one notebook. Pasted text, uploads, and Drive files without a URL are skipped. Matching URLs already on the destination are skipped. A standard NotebookLM notebook holds 50 sources, and the merge stops if that cap would be exceeded. The other notebooks stay as they are.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex max-h-72 flex-col gap-1 overflow-y-auto py-2">
+                  {mergeSelection.map((notebook) => (
+                    <label
+                      key={notebook.id}
+                      className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60"
+                    >
+                      <input
+                        type="radio"
+                        name="merge-destination"
+                        checked={mergeMode === 'existing' && mergeDestinationId === notebook.id}
+                        onChange={() => {
+                          setMergeMode('existing')
+                          setMergeDestinationId(notebook.id)
+                        }}
+                        className={`${checkboxClassName} mt-1`}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-medium">{notebook.title}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {notebook.source_count}{' '}
+                          {notebook.source_count === 1 ? 'source' : 'sources'}
+                        </span>
+                      </span>
+                    </label>
+                  ))}
+                  <label className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60">
+                    <input
+                      type="radio"
+                      name="merge-destination"
+                      checked={mergeMode === 'new'}
+                      onChange={() => setMergeMode('new')}
+                      className={`${checkboxClassName} mt-1`}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">New notebook</span>
+                      {mergeMode === 'new' ? (
+                        <input
+                          value={mergeTitle}
+                          onChange={(event) => setMergeTitle(event.target.value)}
+                          placeholder="Merged notebook"
+                          aria-label="New notebook title"
+                          className={`${fieldClassName} mt-2`}
+                          autoFocus
+                        />
+                      ) : null}
+                    </span>
+                  </label>
+                </div>
+                {mergeError ? (
+                  <Alert variant="destructive">
+                    <AlertDescription>{mergeError}</AlertDescription>
+                  </Alert>
+                ) : null}
+                {mergeOverCap ? (
+                  <div className="space-y-2">
+                    <Alert variant={mergeSelectionOverCap ? 'destructive' : 'default'}>
+                      <AlertDescription>
+                        {mergeChoices
+                          ? `This merge would put ${mergeProjectedSources} sources on the destination. A standard notebook holds ${mergeCap}.`
+                          : `These notebooks list ${mergeListedSources} sources. A standard notebook holds ${mergeCap}.`}
+                        {mergeSelectionOverCap ? ' Uncheck sources to get under that cap.' : null}
+                      </AlertDescription>
+                    </Alert>
+                    {mergeChoicesLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading sources…</p>
+                    ) : null}
+                    {mergeChoicesError ? (
+                      <p className="text-sm text-destructive">{mergeChoicesError}</p>
+                    ) : null}
+                    {mergeChoices ? (
+                      <div className="flex max-h-48 flex-col gap-1 overflow-y-auto">
+                        {mergeChoices.choices.map((choice) => {
+                          const note = mergeChoiceNote(choice.role)
+                          const checked = choice.role === 'destination' || (choice.role === 'add' && includedSourceKeys.has(choice.key))
+                          return (
+                            <label
+                              key={choice.key}
+                              className="flex items-start gap-2 rounded-md px-2 py-1.5 hover:bg-muted/60"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={choice.role !== 'add' || mergePending}
+                                onChange={() => toggleMergeSource(choice.key)}
+                                className={`${checkboxClassName} mt-1`}
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm">
+                                  {choice.title ?? choice.url ?? 'Untitled source'}
+                                </span>
+                                <span className="block truncate text-xs text-muted-foreground">
+                                  {choice.notebookTitle}
+                                  {note ? ` - ${note}` : ''}
+                                </span>
+                              </span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                <DialogFooter>
+                  <DialogClose type="button" disabled={mergePending}>
+                    Cancel
+                  </DialogClose>
+                  <Button
+                    type="submit"
+                    disabled={
+                      mergePending
+                      || (mergeMode === 'new' && !mergeTitle.trim())
+                      || (mergeOverCap && mergeChoicesLoading)
+                      || (mergeSelectedUrls != null && (mergeSelectionOverCap || mergeSelectedUrls.length === 0))
+                    }
+                  >
+                    {mergePending ? 'Merging…' : 'Merge'}
+                  </Button>
+                </DialogFooter>
+              </form>
+            )}
           </DialogContent>
         </Dialog>
 

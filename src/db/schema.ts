@@ -98,8 +98,30 @@ export const linkedinSavedItems = sqliteTable('linkedin_saved_items', {
   deletedAt: text('deleted_at'),
 })
 
+export const redditSavedItems = sqliteTable('reddit_saved_items', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  redditName: text('reddit_name').notNull().unique(),
+  kind: text('kind', { enum: ['link', 'comment'] }).notNull(),
+  title: text('title').notNull(),
+  url: text('url').notNull(),
+  permalink: text('permalink').notNull(),
+  subreddit: text('subreddit').notNull().default(''),
+  author: text('author').notNull().default(''),
+  contentText: text('content_text'),
+  over18: integer('over_18').notNull().default(0),
+  notebooklmUrl: text('notebooklm_url'),
+  notebooklmLinks: text('notebooklm_links').notNull().default('[]'),
+  lastViewed: text('last_viewed'),
+  pinned: integer('pinned').notNull().default(0),
+  tags: text('tags').notNull().default('[]'),
+  createdAt: text('created_at').notNull(),
+  updatedAt: text('updated_at').notNull(),
+  deletedAt: text('deleted_at'),
+})
+
 export type SummaryEntry = typeof summaryEntries.$inferSelect
 export type Notebook = typeof notebooks.$inferSelect
 export type Bookmark = typeof bookmarks.$inferSelect
 export type MetaAnalysis = typeof metaAnalyses.$inferSelect
 export type LinkedInSavedItem = typeof linkedinSavedItems.$inferSelect
+export type RedditSavedItem = typeof redditSavedItems.$inferSelect

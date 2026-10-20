@@ -36,6 +36,8 @@ import {
   buildPinnedRows,
   VirtualizedList,
 } from '@/components/VirtualizedList'
+import { ConnectorNotebookAdd } from '@/components/ConnectorNotebookAdd'
+import { useTabSelection } from '@/hooks/useTabSelection'
 import { useInfiniteList } from '@/hooks/useInfiniteList'
 import { useThrottledValue } from '@/hooks/useThrottledValue'
 import { truncateNotebookTitle } from '@/lib/notebook-links'
@@ -63,12 +65,16 @@ function displayTitle(item: LinkedInSavedItemRow) {
 
 const LinkedInCard = memo(function LinkedInCard({
   item,
+  selected,
+  onSelectedChange,
   onDelete,
   onPinned,
   onViewed,
   onNotebookCreated,
 }: {
   item: LinkedInSavedItemRow
+  selected: boolean
+  onSelectedChange: (id: number, checked: boolean) => void
   onDelete: (id: number) => Promise<void>
   onPinned: (item: LinkedInSavedItemRow) => void
   onViewed: (item: LinkedInSavedItemRow) => void
@@ -126,6 +132,14 @@ const LinkedInCard = memo(function LinkedInCard({
   return (
     <Card size="sm">
       <CardHeader>
+        <div className="flex min-w-0 items-start gap-2">
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={(event) => onSelectedChange(item.id, event.target.checked)}
+            aria-label={`Select ${displayTitle(item)}`}
+            className="mt-1 size-3.5 shrink-0 rounded border-border accent-primary"
+          />
         <CardTitle className="text-base leading-snug">
           <a
             href={plantUrl(item)}
@@ -137,6 +151,7 @@ const LinkedInCard = memo(function LinkedInCard({
             {displayTitle(item)}
           </a>
         </CardTitle>
+        </div>
         <CardAction className="flex items-center gap-1">
           <Button
             type="button"
@@ -277,6 +292,8 @@ export default function LinkedInSavedView() {
     reload,
   } = useInfiniteList<LinkedInSavedItemRow>('/api/linkedin-saved', filters)
 
+  const { selectedIds, toggleSelected, clearSelection } = useTabSelection('linkedin', items, loading)
+
   const rows = useMemo(
     () =>
       buildPinnedRows(items, true, { pinned: 'Pinned', rest: 'Saved' }, { showStatus: true }),
@@ -347,6 +364,13 @@ export default function LinkedInSavedView() {
         </Alert>
       ) : null}
 
+      <ConnectorNotebookAdd
+        onCleared={clearSelection}
+        onUpdated={(resource, row) => {
+          if (resource.connector === 'linkedin') replaceItem(row as LinkedInSavedItemRow)
+        }}
+      />
+
       {loading && items.length === 0 ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : items.length === 0 ? (
@@ -383,6 +407,15 @@ export default function LinkedInSavedView() {
             return (
               <LinkedInCard
                 item={item}
+                selected={selectedIds.has(item.id)}
+                onSelectedChange={(id, checked) => {
+                  const row = items.find((entry) => entry.id === id)
+                  toggleSelected(
+                    id,
+                    checked,
+                    row ? { title: displayTitle(row), url: plantUrl(row) } : undefined,
+                  )
+                }}
                 onDelete={onDelete}
                 onPinned={onPinned}
                 onViewed={onViewed}

@@ -21,13 +21,9 @@ import {
   XIcon,
 } from 'lucide-react'
 import {
-  addVideosToNotebook,
-  bulkCreateNotebookForVideos,
   createNotebookForVideo,
-  defaultBulkBookmarkNotebookTitle,
   saveBookmarkNotebookUrl,
 } from '@/notebooklm-importer'
-import { fetchNotebooks } from '@/api/notebooks'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -57,6 +53,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ConnectorNotebookAdd } from '@/components/ConnectorNotebookAdd'
+import { selectedConnectorResources, useTabSelection } from '@/hooks/useTabSelection'
 import { useThrottledValue } from '@/hooks/useThrottledValue'
 import { useInfiniteList } from '@/hooks/useInfiniteList'
 import {
@@ -75,8 +73,7 @@ import {
 } from '@/lib/bookmark-list'
 import { normalizeTag } from '@/lib/tags'
 import { truncateNotebookTitle } from '@/lib/notebook-links'
-import { searchNotebooks, sortNotebooks } from '@/lib/notebook-list'
-import type { BookmarkRow, NotebookRow } from '@/types'
+import type { BookmarkRow } from '@/types'
 
 const fieldClassName =
   'h-8 w-full rounded-[min(var(--radius-md),12px)] border border-border bg-background px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
@@ -514,25 +511,12 @@ export default function BookmarksView() {
   const [searchScope, setSearchScope] = useState<SearchScope>('all')
   const deferredFilterQuery = useDeferredValue(filterQuery)
   const [pinsAtTop, setPinsAtTop] = useState(readBookmarkPinsAtTop)
-  const [selectedIds, setSelectedIds] = useState<Set<number>>(() => new Set())
   const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
   const [bulkDeletePending, setBulkDeletePending] = useState(false)
   const [bulkDeleteError, setBulkDeleteError] = useState<string | null>(null)
   const [bulkTagOpen, setBulkTagOpen] = useState(false)
   const [bulkTagDraft, setBulkTagDraft] = useState('')
   const [bulkTagPending, setBulkTagPending] = useState(false)
-  const [bulkNotebookExistingOpen, setBulkNotebookExistingOpen] = useState(false)
-  const [bulkNotebookPending, setBulkNotebookPending] = useState(false)
-  const [bulkNotebookError, setBulkNotebookError] = useState<string | null>(null)
-  const [bulkNotebookPickerId, setBulkNotebookPickerId] = useState<number | null>(null)
-  const [bulkNotebookOptions, setBulkNotebookOptions] = useState<NotebookRow[]>([])
-  const [bulkNotebookOptionsLoading, setBulkNotebookOptionsLoading] = useState(false)
-  const [bulkNotebookFilterQuery, setBulkNotebookFilterQuery] = useState('')
-  const deferredBulkNotebookFilterQuery = useDeferredValue(bulkNotebookFilterQuery)
-  const filteredBulkNotebookOptions = useMemo(
-    () => searchNotebooks(bulkNotebookOptions, deferredBulkNotebookFilterQuery),
-    [bulkNotebookOptions, deferredBulkNotebookFilterQuery],
-  )
   const [syncing, setSyncing] = useState(false)
   const [syncMessage, setSyncMessage] = useState<string | null>(null)
   const [pendingSummaries, setPendingSummaries] = useState<number | null>(null)
@@ -571,6 +555,12 @@ export default function BookmarksView() {
     setError,
   } = useInfiniteList<BookmarkRow>('/api/bookmarks', listFilters)
 
+  const { selectedIds, toggleSelected, clearSelection } = useTabSelection(
+    'bookmarks',
+    bookmarks,
+    loading,
+  )
+
   useEffect(() => {
     if (tagFilter !== 'all' && !allTags.includes(tagFilter)) {
       setTagFilter('all')
@@ -605,14 +595,6 @@ export default function BookmarksView() {
   )
 
   useEffect(() => {
-    const visibleIdSet = new Set(bookmarks.map((bookmark) => bookmark.id))
-    setSelectedIds((prev) => {
-      const next = new Set([...prev].filter((id) => visibleIdSet.has(id)))
-      return next.size === prev.size ? prev : next
-    })
-  }, [bookmarks])
-
-  useEffect(() => {
     localStorage.setItem(BOOKMARK_PINS_AT_TOP_KEY, String(pinsAtTop))
   }, [pinsAtTop])
 
@@ -624,19 +606,6 @@ export default function BookmarksView() {
     }
     removeItem(id)
   }, [removeItem])
-
-  const toggleSelected = useCallback((id: number, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (checked) next.add(id)
-      else next.delete(id)
-      return next
-    })
-  }, [])
-
-  function clearSelection() {
-    setSelectedIds(new Set())
-  }
 
   function selectedBookmarks() {
     return bookmarks.filter((bookmark) => selectedIds.has(bookmark.id))
@@ -734,98 +703,6 @@ export default function BookmarksView() {
     }
   }
 
-  async function linkBookmarksToNotebook(
-    rows: BookmarkRow[],
-    notebookUrl: string,
-    title: string,
-  ) {
-    for (const bookmark of rows) {
-      const updated = await saveBookmarkNotebookUrl(bookmark.id, notebookUrl, title)
-      replaceBookmark(updated)
-    }
-  }
-
-  async function bulkInsertNewNotebook() {
-    const rows = selectedBookmarks()
-    if (rows.length === 0) return
-
-    setBulkNotebookPending(true)
-    setBulkNotebookError(null)
-    const notebookTab = window.open('about:blank', '_blank', 'noopener,noreferrer')
-    try {
-      const urls = rows.map((bookmark) => bookmark.url)
-      const title = defaultBulkBookmarkNotebookTitle(rows)
-      const result = await bulkCreateNotebookForVideos(title, urls)
-      if (result.error || !result.notebookUrl) {
-        notebookTab?.close()
-        setBulkNotebookError(result.error ?? 'Failed to create notebook')
-        return
-      }
-      await linkBookmarksToNotebook(rows, result.notebookUrl, title)
-      clearSelection()
-      if (notebookTab) {
-        notebookTab.location.href = result.notebookUrl
-      } else {
-        window.open(result.notebookUrl, '_blank', 'noopener,noreferrer')
-      }
-    } catch (bulkError) {
-      notebookTab?.close()
-      setBulkNotebookError(bulkError instanceof Error ? bulkError.message : String(bulkError))
-    } finally {
-      setBulkNotebookPending(false)
-    }
-  }
-
-  async function openBulkNotebookExistingModal() {
-    setBulkNotebookError(null)
-    setBulkNotebookPickerId(null)
-    setBulkNotebookFilterQuery('')
-    setBulkNotebookExistingOpen(true)
-    setBulkNotebookOptionsLoading(true)
-    try {
-      const notebooks = await fetchNotebooks()
-      const sorted = sortNotebooks(notebooks, 'created_desc')
-      setBulkNotebookOptions(sorted)
-      if (sorted.length === 1) {
-        setBulkNotebookPickerId(sorted[0].id)
-      }
-    } catch (loadError) {
-      setBulkNotebookError(loadError instanceof Error ? loadError.message : String(loadError))
-      setBulkNotebookOptions([])
-    } finally {
-      setBulkNotebookOptionsLoading(false)
-    }
-  }
-
-  async function confirmBulkAddToExistingNotebook() {
-    const rows = selectedBookmarks()
-    const notebook = bulkNotebookOptions.find((row) => row.id === bulkNotebookPickerId)
-    if (rows.length === 0 || !notebook) return
-
-    setBulkNotebookPending(true)
-    setBulkNotebookError(null)
-    const notebookTab = window.open(notebook.url, '_blank', 'noopener,noreferrer')
-    try {
-      const result = await addVideosToNotebook(
-        notebook.notebooklm_id,
-        rows.map((bookmark) => bookmark.url),
-      )
-      if (result.error || !result.notebookUrl) {
-        notebookTab?.close()
-        setBulkNotebookError(result.error ?? 'Failed to add sources')
-        return
-      }
-      await linkBookmarksToNotebook(rows, result.notebookUrl, notebook.title)
-      clearSelection()
-      setBulkNotebookExistingOpen(false)
-      setBulkNotebookPickerId(null)
-    } catch (bulkError) {
-      notebookTab?.close()
-      setBulkNotebookError(bulkError instanceof Error ? bulkError.message : String(bulkError))
-    } finally {
-      setBulkNotebookPending(false)
-    }
-  }
 
   function renderBookmark(bookmark: BookmarkRow) {
     return (
@@ -833,7 +710,10 @@ export default function BookmarksView() {
         key={bookmark.id}
         bookmark={bookmark}
         selected={selectedIds.has(bookmark.id)}
-        onSelectedChange={toggleSelected}
+        onSelectedChange={(id, checked) => {
+          const bookmark = bookmarks.find((row) => row.id === id)
+          toggleSelected(id, checked, bookmark ? { title: bookmark.title, url: bookmark.url } : undefined)
+        }}
         onDelete={deleteBookmark}
         onNotebookCreated={replaceBookmark}
         onViewed={replaceBookmark}
@@ -950,8 +830,10 @@ export default function BookmarksView() {
         </Alert>
       ) : null}
 
-      {selectedCount > 0 ? (
+      {selectedCount > 0 || selectedConnectorResources().length > 0 ? (
         <div className="flex flex-wrap items-center gap-3">
+          {selectedCount > 0 ? (
+          <>
           <span className="text-sm text-muted-foreground">{selectedCount} selected</span>
           <Button variant="outline" size="sm" onClick={() => void bulkSetPinned(true)}>
             <PinIcon className="size-3.5" />
@@ -964,24 +846,6 @@ export default function BookmarksView() {
           <Button variant="outline" size="sm" onClick={() => setBulkTagOpen(true)}>
             <TagPlusIcon className="size-3.5" />
             Tag
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={bulkNotebookPending}
-            onClick={() => void bulkInsertNewNotebook()}
-          >
-            <BookOpenIcon className="size-3.5" />
-            Bulk insert to new notebook
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={bulkNotebookPending}
-            onClick={() => void openBulkNotebookExistingModal()}
-          >
-            <BookOpenIcon className="size-3.5" />
-            Bulk add to existing notebook
           </Button>
           <Button
             variant="destructive"
@@ -997,9 +861,14 @@ export default function BookmarksView() {
           <Button variant="ghost" size="sm" onClick={clearSelection}>
             Clear
           </Button>
-          {bulkNotebookError && !bulkNotebookExistingOpen ? (
-            <p className="w-full text-sm text-destructive">{bulkNotebookError}</p>
+          </>
           ) : null}
+          <ConnectorNotebookAdd
+            onCleared={clearSelection}
+            onUpdated={(resource, row) => {
+              if (resource.connector === 'bookmarks') replaceBookmark(row as BookmarkRow)
+            }}
+          />
         </div>
       ) : null}
 
@@ -1078,91 +947,6 @@ export default function BookmarksView() {
               </Button>
             </DialogFooter>
           </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={bulkNotebookExistingOpen}
-        onOpenChange={(open) => {
-          setBulkNotebookExistingOpen(open)
-          if (!open) {
-            setBulkNotebookPickerId(null)
-            setBulkNotebookFilterQuery('')
-            setBulkNotebookError(null)
-          }
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-hidden sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add {selectedCount} bookmarks to notebook</DialogTitle>
-            <DialogDescription>
-              Choose an existing NotebookLM notebook. Selected URLs are added as sources.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-2 py-2">
-            <input
-              type="search"
-              value={bulkNotebookFilterQuery}
-              onChange={(event) => setBulkNotebookFilterQuery(event.target.value)}
-              placeholder="Search notebooks…"
-              aria-label="Search notebooks"
-              className={fieldClassName}
-              disabled={bulkNotebookOptionsLoading || bulkNotebookOptions.length === 0}
-              autoFocus
-            />
-            <div className="flex max-h-72 flex-col gap-1 overflow-y-auto">
-              {bulkNotebookOptionsLoading ? (
-                <p className="text-sm text-muted-foreground">Loading notebooks…</p>
-              ) : bulkNotebookOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No notebooks in the local cache. Sync from Notebooks first.
-                </p>
-              ) : filteredBulkNotebookOptions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No notebooks match.</p>
-              ) : (
-                filteredBulkNotebookOptions.map((notebook) => (
-                  <label
-                    key={notebook.id}
-                    className="flex cursor-pointer items-start gap-2 rounded-md px-2 py-2 hover:bg-muted/60"
-                  >
-                    <input
-                      type="radio"
-                      name="bulk-bookmark-notebook-target"
-                      checked={bulkNotebookPickerId === notebook.id}
-                      onChange={() => setBulkNotebookPickerId(notebook.id)}
-                      className={`${checkboxClassName} mt-1`}
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">{notebook.title}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {notebook.source_count}{' '}
-                        {notebook.source_count === 1 ? 'source' : 'sources'}
-                      </span>
-                    </span>
-                  </label>
-                ))
-              )}
-            </div>
-          </div>
-          {bulkNotebookError ? (
-            <p className="text-sm text-destructive">{bulkNotebookError}</p>
-          ) : null}
-          <DialogFooter>
-            <DialogClose type="button" disabled={bulkNotebookPending}>
-              Cancel
-            </DialogClose>
-            <Button
-              type="button"
-              disabled={
-                bulkNotebookPending ||
-                bulkNotebookOptionsLoading ||
-                bulkNotebookPickerId == null
-              }
-              onClick={() => void confirmBulkAddToExistingNotebook()}
-            >
-              {bulkNotebookPending ? 'Adding…' : 'Add to notebook'}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

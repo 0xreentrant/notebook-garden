@@ -17,6 +17,11 @@ export const APP_TABS = [
     description: 'Browse captured LinkedIn Saved items',
   },
   {
+    path: '/reddit',
+    label: 'Reddit Saved',
+    description: 'Browse Reddit saved posts and comments',
+  },
+  {
     path: '/notebooks',
     label: 'Notebooks',
     description: 'Tend your NotebookLM notebooks',

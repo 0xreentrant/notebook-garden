@@ -135,6 +135,63 @@ export async function createNotebook(title = 'Untitled notebook'): Promise<Creat
   return response.json() as Promise<CreateNotebookRemoteResult>
 }
 
+export type NotebookMergeReport = {
+  destinationNotebooklmId: string
+  destinationTitle: string
+  destinationUrl: string
+  addedCount: number
+  skipped: { title: string | null; reason: 'no-url' | 'duplicate' }[]
+  sourceCount: number
+}
+
+export type MergeSourceChoice = {
+  key: string
+  title: string | null
+  url: string | null
+  notebookTitle: string
+  role: 'destination' | 'add' | 'duplicate' | 'no-url'
+}
+
+export type MergeSourcePreview = {
+  destinationSourceCount: number
+  cap: number
+  choices: MergeSourceChoice[]
+}
+
+export async function previewMergeSources(input: {
+  sourceNotebooklmIds: string[]
+  destinationNotebooklmId?: string
+}): Promise<MergeSourcePreview> {
+  const response = await fetch('/api/notebooks/merge/preview', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const payload = await response.json().catch(() => ({})) as { error?: string }
+  if (!response.ok) {
+    throw new Error(payload.error ?? `HTTP ${response.status}`)
+  }
+  return payload as MergeSourcePreview
+}
+
+export async function mergeNotebooks(input: {
+  sourceNotebooklmIds: string[]
+  destinationNotebooklmId?: string
+  title?: string
+  urls?: string[]
+}): Promise<NotebookMergeReport> {
+  const response = await fetch('/api/notebooks/merge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+  const payload = await response.json().catch(() => ({})) as { error?: string }
+  if (!response.ok) {
+    throw new Error(payload.error ?? `HTTP ${response.status}`)
+  }
+  return payload as NotebookMergeReport
+}
+
 export async function syncNotebooks(): Promise<NotebookRow[]> {
   const response = await fetch('/api/notebooks/sync', { method: 'POST' })
   if (!response.ok) {

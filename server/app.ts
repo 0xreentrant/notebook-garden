@@ -23,12 +23,20 @@ import {
   softDeleteLinkedInSaved,
 } from '../src/server/linkedin-saved-api'
 import {
+  listRedditSavedPage,
+  getRedditSaved,
+  patchRedditSaved,
+  softDeleteRedditSaved,
+  syncRedditSaved,
+} from '../src/server/reddit-saved-api'
+import { RedditAuthError } from '../src/server/reddit-client'
+import {
   getDbPath,
   listCachedNotebooks,
   listCachedNotebooksPage,
   upsertNotebooks,
 } from '../src/server/notebook-db'
-import { createNotebooklmImport, createNotebooklmBulkImport, addSourcesToNotebooklm } from '../src/server/notebooklm-routes'
+import { createNotebooklmImport, createNotebooklmBulkImport, addSourcesToNotebooklm, mergeNotebooks, previewMergeNotebooks } from '../src/server/notebooklm-routes'
 import {
   generateMetaAnalysis,
   getLatestMetaAnalysis,
@@ -315,6 +323,68 @@ export function createApp() {
     }
   })
 
+  app.get('/api/reddit-saved', (c) => {
+    try {
+      return c.json(listRedditSavedPage(parseListPageQuery(new URL(c.req.url).searchParams)))
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.post('/api/reddit-saved/sync', async (c) => {
+    try {
+      return c.json(await syncRedditSaved())
+    } catch (error) {
+      const status = error instanceof RedditAuthError ? 401 : 500
+      return c.json({ error: error instanceof Error ? error.message : String(error) }, status)
+    }
+  })
+
+  app.get('/api/reddit-saved/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+    try {
+      const result = getRedditSaved(id)
+      if (!result.ok) return c.json({ error: result.error }, 404)
+      return c.json(result.row)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.patch('/api/reddit-saved/:id', async (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+
+    let body: unknown
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    try {
+      const result = patchRedditSaved(id, body as Parameters<typeof patchRedditSaved>[1])
+      if (!result.ok) return c.json({ error: result.error }, result.status as 400 | 404)
+      return c.json(result.row)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
+  app.delete('/api/reddit-saved/:id', (c) => {
+    const id = Number(c.req.param('id'))
+    if (!Number.isFinite(id)) return c.json({ error: 'invalid id' }, 400)
+
+    try {
+      const result = softDeleteRedditSaved(id)
+      if (!result.ok) return c.json({ error: result.error }, 404)
+      return c.body(null, 204)
+    } catch (error) {
+      return c.json({ error: String(error) }, 500)
+    }
+  })
+
   app.post('/api/notebooklm/create-and-import', async (c) => {
     let body: { title?: unknown; url?: unknown }
     try {
@@ -364,7 +434,7 @@ export function createApp() {
     try {
       const result = await createNotebooklmBulkImport(body.title.trim(), urls)
       if (result.error || !result.notebookUrl) {
-        return c.json({ error: result.error ?? 'Failed to create notebook' }, 500)
+        return c.json({ error: result.error ?? 'Failed to create notebook' }, result.status ?? 500)
       }
       return c.json(result)
     } catch (error) {
@@ -395,7 +465,7 @@ export function createApp() {
     try {
       const result = await addSourcesToNotebooklm(body.notebooklmId.trim(), urls)
       if (result.error || !result.notebookUrl) {
-        return c.json({ error: result.error ?? 'Failed to add sources' }, 500)
+        return c.json({ error: result.error ?? 'Failed to add sources' }, result.status ?? 500)
       }
       return c.json(result)
     } catch (error) {
@@ -510,6 +580,64 @@ export function createApp() {
       return c.json({ error: String(error) }, 500)
     } finally {
       sqlite.close()
+    }
+  })
+
+  app.post('/api/notebooks/merge/preview', async (c) => {
+    let body: { sourceNotebooklmIds?: unknown; destinationNotebooklmId?: unknown }
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    const sourceNotebooklmIds = Array.isArray(body.sourceNotebooklmIds)
+      ? body.sourceNotebooklmIds.filter((id): id is string => typeof id === 'string')
+      : []
+    const destinationNotebooklmId = typeof body.destinationNotebooklmId === 'string'
+      ? body.destinationNotebooklmId
+      : undefined
+
+    try {
+      const result = await previewMergeNotebooks({ sourceNotebooklmIds, destinationNotebooklmId })
+      if ('error' in result) {
+        return c.json({ error: result.error }, result.status)
+      }
+      return c.json(result)
+    } catch (error) {
+      const { status, error: message } = authErrorStatus(error)
+      return c.json({ error: message }, status)
+    }
+  })
+
+  app.post('/api/notebooks/merge', async (c) => {
+    let body: { sourceNotebooklmIds?: unknown; destinationNotebooklmId?: unknown; title?: unknown; urls?: unknown }
+    try {
+      body = await c.req.json()
+    } catch {
+      return c.json({ error: 'Invalid JSON body' }, 400)
+    }
+
+    const sourceNotebooklmIds = Array.isArray(body.sourceNotebooklmIds)
+      ? body.sourceNotebooklmIds.filter((id): id is string => typeof id === 'string')
+      : []
+    const destinationNotebooklmId = typeof body.destinationNotebooklmId === 'string'
+      ? body.destinationNotebooklmId
+      : undefined
+    const title = typeof body.title === 'string' ? body.title : undefined
+    const urls = Array.isArray(body.urls)
+      ? body.urls.filter((url): url is string => typeof url === 'string')
+      : undefined
+
+    try {
+      const result = await mergeNotebooks({ sourceNotebooklmIds, destinationNotebooklmId, title, urls })
+      if ('error' in result) {
+        return c.json({ error: result.error }, result.status)
+      }
+      return c.json(result)
+    } catch (error) {
+      const { status, error: message } = authErrorStatus(error)
+      return c.json({ error: message }, status)
     }
   })
 

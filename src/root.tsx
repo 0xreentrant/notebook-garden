@@ -8,7 +8,7 @@ import {
   Scripts,
   ScrollRestoration,
 } from 'react-router'
-import { BookmarkIcon, BookOpenIcon, LinkIcon, SparklesIcon } from 'lucide-react'
+import { BookmarkIcon, BookOpenIcon, LinkIcon, MessageSquareIcon, SparklesIcon } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { fetchSettings } from '@/api/settings'
 import MetaAnalysisModal from '@/components/MetaAnalysisModal'
@@ -30,6 +30,7 @@ const TAB_ICONS: Record<AppTabPath, LucideIcon | typeof YouTubeIcon> = {
   '/youtube': YouTubeIcon,
   '/bookmarks': BookmarkIcon,
   '/linkedin': LinkIcon,
+  '/reddit': MessageSquareIcon,
   '/notebooks': BookOpenIcon,
 }
 
@@ -80,7 +81,7 @@ export default function Root() {
                 notebook-garden
               </h1>
               <p className="text-sm text-muted-foreground">
-                Plant notebooks from summarized videos and bookmarks, then tend your notebooks.
+                Plant notebooks from summarized videos, bookmarks, and saved posts, then tend your notebooks.
               </p>
             </div>
             <div className="flex items-center gap-2">

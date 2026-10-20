@@ -98,3 +98,25 @@ export type LinkedInSavedItemRow = {
   updated_at: string
   deleted_at: string | null
 }
+
+export type RedditSavedItemRow = {
+  id: number
+  reddit_name: string
+  kind: 'link' | 'comment'
+  title: string
+  url: string
+  permalink: string
+  subreddit: string
+  author: string
+  content_text: string | null
+  text_overflow?: boolean
+  over_18: number
+  notebooklm_url: string | null
+  notebooklm_links: NotebookLink[]
+  last_viewed: string | null
+  pinned: number
+  tags: string[]
+  created_at: string
+  updated_at: string
+  deleted_at: string | null
+}

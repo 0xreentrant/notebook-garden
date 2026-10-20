@@ -93,6 +93,26 @@ export function applySchema(dbPath: string) {
       updated_at TEXT NOT NULL,
       deleted_at TEXT
     );
+    CREATE TABLE reddit_saved_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      reddit_name TEXT NOT NULL UNIQUE,
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      url TEXT NOT NULL,
+      permalink TEXT NOT NULL,
+      subreddit TEXT NOT NULL DEFAULT '',
+      author TEXT NOT NULL DEFAULT '',
+      content_text TEXT,
+      over_18 INTEGER NOT NULL DEFAULT 0,
+      notebooklm_url TEXT,
+      notebooklm_links TEXT NOT NULL DEFAULT '[]',
+      last_viewed TEXT,
+      pinned INTEGER NOT NULL DEFAULT 0,
+      tags TEXT NOT NULL DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
+    );
   `)
   sqlite.close()
 }

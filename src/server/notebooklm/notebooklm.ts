@@ -14,6 +14,7 @@ export const NOTEBOOK_URL_PREFIX = `${NOTEBOOKLM_BASE_URL}/notebook/`
 
 export const RPC_LIST_NOTEBOOKS = 'wXbhsf'
 export const RPC_CREATE_NOTEBOOK = 'CCqFvf'
+export const RPC_GET_NOTEBOOK = 'rLM1Ne'
 export const RPC_ADD_SOURCES = 'izAoDd'
 export const RPC_RENAME_NOTEBOOK = 's0tc2d'
 export const RPC_DELETE_NOTEBOOK = 'WWINqb'
@@ -220,6 +221,25 @@ export async function fetchNotebookListFromApi(cookie: string): Promise<Notebook
     throw new Error('NotebookLM returned no notebooks. Check NOTEBOOKLM_COOKIE.')
   }
   return parseNotebookList(result)
+}
+
+// Nested request context required by migrated GET_NOTEBOOK. Flat [2] is rejected on those accounts.
+const GET_NOTEBOOK_CONTEXT = [2, null, null, [1, null, null, null, null, null, null, null, null, null, [1]]]
+
+export async function fetchNotebookDetailViaApi(
+  cookie: string,
+  notebooklmId: string,
+): Promise<unknown> {
+  const result = await rpcCall(
+    cookie,
+    RPC_GET_NOTEBOOK,
+    [notebooklmId, null, GET_NOTEBOOK_CONTEXT, null, 0],
+    `/notebook/${notebooklmId}`,
+  )
+  if (result == null) {
+    throw new Error(`NotebookLM returned no notebook for ${notebooklmId}`)
+  }
+  return result
 }
 
 export async function renameNotebookViaApi(

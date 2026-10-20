@@ -55,6 +55,29 @@ export async function saveLinkedInNotebookUrl(
   return saveResourceNotebookUrl(`/api/linkedin-saved/${itemId}`, notebookUrl, title)
 }
 
+export async function saveRedditNotebookUrl(
+  itemId: number,
+  notebookUrl: string,
+  title = 'NotebookLM',
+): Promise<import('./types').RedditSavedItemRow> {
+  return saveResourceNotebookUrl(`/api/reddit-saved/${itemId}`, notebookUrl, title)
+}
+
+export async function saveConnectorNotebookUrl(
+  connector: 'youtube' | 'bookmarks' | 'linkedin' | 'reddit',
+  id: number,
+  notebookUrl: string,
+  title: string,
+) {
+  const path = {
+    youtube: `/api/entries/${id}`,
+    bookmarks: `/api/bookmarks/${id}`,
+    linkedin: `/api/linkedin-saved/${id}`,
+    reddit: `/api/reddit-saved/${id}`,
+  }[connector]
+  return saveResourceNotebookUrl(path, notebookUrl, title)
+}
+
 async function saveResourceNotebookUrl<T>(
   path: string,
   notebookUrl: string,

@@ -2,7 +2,9 @@ import { useCallback } from 'react'
 import {
   createNotebook as createNotebookApi,
   deleteNotebook as deleteNotebookApi,
+  mergeNotebooks as mergeNotebooksApi,
   patchNotebook,
+  previewMergeSources as previewMergeSourcesApi,
   renameNotebook as renameNotebookApi,
   syncNotebooks,
 } from '@/api/notebooks'
@@ -37,11 +39,29 @@ export function useNotebooks() {
     return { notebook, notebooks: remote }
   }, [sync])
 
+  const merge = useCallback(async (input: {
+    sourceNotebooklmIds: string[]
+    destinationNotebooklmId?: string
+    title?: string
+    urls?: string[]
+  }) => {
+    return mergeNotebooksApi(input)
+  }, [])
+
+  const previewMerge = useCallback(async (input: {
+    sourceNotebooklmIds: string[]
+    destinationNotebooklmId?: string
+  }) => {
+    return previewMergeSourcesApi(input)
+  }, [])
+
   return {
     sync,
     createNotebook: create,
     updateNotebook,
     renameNotebook: rename,
     deleteNotebook: remove,
+    mergeNotebooks: merge,
+    previewMergeSources: previewMerge,
   }
 }
