@@ -1,32 +1,10 @@
 import type { BookmarkRow, SummaryEntryRow } from './types'
 
-export const NOTEBOOKLM_EXTENSION_ID = 'paacnibobhcimjiadlfhbflfkdcfiabl'
-
 export type CreateNotebookResult = {
   success?: boolean
   notebookId?: string
   notebookUrl?: string
   error?: string
-}
-
-function createNotebookViaExtension(
-  title: string,
-  url: string,
-): Promise<CreateNotebookResult> {
-  const chromeApi = (globalThis as { chrome?: typeof chrome }).chrome!
-  return new Promise((resolve) => {
-    chromeApi.runtime.sendMessage(
-      NOTEBOOKLM_EXTENSION_ID,
-      { cmd: 'create-and-import', title, url },
-      (response: CreateNotebookResult | undefined) => {
-        if (chromeApi.runtime.lastError) {
-          resolve({ error: chromeApi.runtime.lastError.message })
-          return
-        }
-        resolve(response ?? { error: 'No response from extension' })
-      },
-    )
-  })
 }
 
 async function createNotebookViaApi(
@@ -50,10 +28,6 @@ export function createNotebookForVideo(
   title: string,
   url: string,
 ): Promise<CreateNotebookResult> {
-  const chromeApi = (globalThis as { chrome?: typeof chrome }).chrome
-  if (chromeApi?.runtime?.sendMessage) {
-    return createNotebookViaExtension(title, url)
-  }
   return createNotebookViaApi(title, url)
 }
 

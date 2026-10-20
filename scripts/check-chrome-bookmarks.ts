@@ -1,13 +1,21 @@
 import assert from 'node:assert/strict'
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, platform, tmpdir } from 'node:os'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 import {
   chromeTimeToIso,
   collectChromeBookmarks,
+  defaultChromeUserDataDir,
   parseChromeBookmarksFile,
 } from '../src/server/chrome-bookmarks.ts'
+
+const chromeDir = platform() === 'darwin'
+  ? path.join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome')
+  : platform() === 'win32'
+    ? path.join(homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data')
+    : path.join(homedir(), '.config', 'google-chrome')
+assert.equal(defaultChromeUserDataDir(), chromeDir)
 
 const sample = {
   roots: {

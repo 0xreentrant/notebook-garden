@@ -1,4 +1,3 @@
-// RPC IDs - keep in sync with extension/background.js
 export const DEFAULT_NOTEBOOKLM_BASE_URL = 'https://notebook.google.com'
 
 export function resolveNotebooklmBaseUrl(

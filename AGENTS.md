@@ -38,16 +38,19 @@ Tests create their own temporary databases. They do not need `summaries.db`.
 
 Standalone API, if you are not using the dev server: `npm run start:api` (port 3002, override with `PORT`).
 
-## Optional: NotebookLM
+## NotebookLM login
 
-Skip this unless the task is creating, syncing, renaming, or deleting notebooks.
+After `npm run dev` is up, run token acquisition in another terminal. Google Chrome must be installed. This opens a Chrome window and pauses in the Playwright inspector:
 
-- `npm run login`, or set `NOTEBOOKLM_COOKIE`.
-- `NOTEBOOKLM_BASE_URL` defaults to `https://notebook.google.com`.
-- `YT_PROFILE_DIR` defaults to `~/.config/youtube-ask-summarize/chrome-profile`.
-- Unpacked Chrome extension instructions are in `extension/README.md`. The dev server must be on `localhost` or `127.0.0.1`.
+```bash
+npm run login
+```
 
-Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` before `npm ci` only when NotebookLM login is not needed and install time matters. Login needs the Playwright browser.
+The person signs in at NotebookLM. Then resume the inspector. The script prints `NotebookLM login OK` and stores the session under `~/.config/youtube-ask-summarize/chrome-profile` (override with `YT_PROFILE_DIR`). That directory is the same on macOS and Linux. Create, sync, rename, and delete use that session through the API.
+
+Bookmark sync reads the machine Chrome profile: `~/Library/Application Support/Google/Chrome` on macOS, `~/.config/google-chrome` on Linux.
+
+Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` before `npm ci` only when this login will not be run. Login needs the Playwright browser.
 
 ## Not part of app setup
 

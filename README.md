@@ -36,7 +36,7 @@ npm run db:migrate
 npm run dev
 ```
 
-NotebookLM auth: `npm run login` or set `NOTEBOOKLM_COOKIE`. Base URL: `NOTEBOOKLM_BASE_URL` (default `https://notebook.google.com`). Profile dir: `YT_PROFILE_DIR` (default `~/.config/youtube-ask-summarize/chrome-profile`).
+NotebookLM auth: `npm run login` (see [AGENTS.md](AGENTS.md)). Bookmark sync uses the macOS or Linux Chrome user-data directory for this machine.
 
 ## API
 

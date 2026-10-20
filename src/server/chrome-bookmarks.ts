@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, platform } from 'node:os'
 import path from 'node:path'
 
 export type ChromeBookmarkFlat = {
@@ -40,6 +40,12 @@ type ChromeBookmarksFile = {
 const SKIP_PROFILES = new Set(['Guest Profile', 'System Profile'])
 
 export function defaultChromeUserDataDir() {
+  if (platform() === 'darwin') {
+    return path.join(homedir(), 'Library', 'Application Support', 'Google', 'Chrome')
+  }
+  if (platform() === 'win32') {
+    return path.join(homedir(), 'AppData', 'Local', 'Google', 'Chrome', 'User Data')
+  }
   return path.join(homedir(), '.config', 'google-chrome')
 }
 
