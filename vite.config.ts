@@ -2,6 +2,8 @@ import path from 'path'
 import tailwindcss from '@tailwindcss/vite'
 import { reactRouter } from '@react-router/dev/vite'
 import { defineConfig, loadEnv, type PreviewServer, type ViteDevServer } from 'vite'
+// ponytail: extensionless on purpose. The bundle config loader resolves this graph.
+// Native config loader cannot. Scripts set VITE_CONFIG_NATIVE_IGNORE_WARNING.
 import { apiMiddleware } from './src/server/api-middleware'
 
 function apiPlugin() {
@@ -30,7 +32,7 @@ export default defineConfig(({ mode }) => {
     plugins: [reactRouter(), tailwindcss(), apiPlugin()],
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src'),
+        '@': path.resolve(import.meta.dirname, './src'),
       },
     },
     optimizeDeps: {
