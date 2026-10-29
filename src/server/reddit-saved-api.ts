@@ -10,11 +10,7 @@ import {
 } from '../lib/notebook-links'
 import { parseTags, serializeTags } from '../lib/tags'
 import { NOTEBOOKLM_URL_PREFIX } from './entries-api'
-import {
-  fetchSavedPages,
-  validAccessToken,
-  type MappedRedditSaved,
-} from './reddit-client'
+import type { MappedRedditSaved } from './reddit-client'
 import {
   buildCommonFilters,
   buildOrderBy,
@@ -137,18 +133,6 @@ export function upsertRedditSavedItems(items: MappedRedditSaved[]) {
     return { upserted: items.length }
   } finally {
     db.close()
-  }
-}
-
-export async function syncRedditSaved() {
-  const { token, username } = await validAccessToken()
-  const fetched = await fetchSavedPages(token, username)
-  upsertRedditSavedItems(fetched.items)
-  return {
-    fetched: fetched.items.length,
-    pages: fetched.pages,
-    username,
-    truncated: fetched.truncated,
   }
 }
 

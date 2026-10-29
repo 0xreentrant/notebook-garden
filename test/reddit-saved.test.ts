@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { createHarness, notebookUrl, request, type Harness } from './helpers/harness'
 import {
+  MAX_SAVED_PAGES,
   listingAfter,
   mapSavedChild,
   mapSavedListing,
-  parseTokenResponse,
+  walkSavedPages,
 } from '../src/server/reddit-client'
 import { upsertRedditSavedItems } from '../src/server/reddit-saved-api'
 
@@ -110,21 +111,19 @@ describe('reddit saved mapping', () => {
     expect(() => mapSavedListing({})).toThrow(/children/)
   })
 
-  it('parses token success and error bodies', () => {
-    expect(parseTokenResponse({
-      access_token: 'access',
-      expires_in: 3600,
-      refresh_token: 'refresh',
-      scope: 'identity history',
-    })).toEqual({
-      access_token: 'access',
-      expires_in: 3600,
-      refresh_token: 'refresh',
-      scope: 'identity history',
+  it('ends on a null after and flags the page cap', async () => {
+    const done = await walkSavedPages(async () => ({ data: { children: [], after: null } }))
+    expect(done.pages).toBe(1)
+    expect(done.truncated).toBe(false)
+
+    let calls = 0
+    const capped = await walkSavedPages(async () => {
+      calls += 1
+      return { data: { children: [], after: `t3_${calls}` } }
     })
-    expect(parseTokenResponse({ access_token: 'access' }).expires_in).toBe(3600)
-    expect(() => parseTokenResponse({ error: 'invalid_grant' })).toThrow(/invalid_grant/)
-    expect(() => parseTokenResponse({ token_type: 'bearer' })).toThrow(/access_token/)
+    expect(calls).toBe(MAX_SAVED_PAGES)
+    expect(capped.pages).toBe(MAX_SAVED_PAGES)
+    expect(capped.truncated).toBe(true)
   })
 })
 
@@ -227,19 +226,5 @@ describe('reddit saved store', () => {
     db.close()
     expect(deleted.title).toBe('Gone')
     expect(deleted.deleted_at).toBeTruthy()
-  })
-
-  it('returns 401 when sync has no token', async () => {
-    const previous = process.env.REDDIT_TOKEN_PATH
-    process.env.REDDIT_TOKEN_PATH = '/tmp/notebook-garden-missing-reddit-token.json'
-    try {
-      const response = await request(h.app, 'http://localhost/api/reddit-saved/sync', { method: 'POST' })
-      expect(response.status).toBe(401)
-      const body = await response.json()
-      expect(body.error).toMatch(/reddit:login/)
-    } finally {
-      if (previous === undefined) delete process.env.REDDIT_TOKEN_PATH
-      else process.env.REDDIT_TOKEN_PATH = previous
-    }
   })
 })

@@ -263,8 +263,6 @@ export default function RedditSavedView() {
   const [search, setSearch] = useState('')
   const throttledSearch = useThrottledValue(search, 200)
   const [localError, setLocalError] = useState<string | null>(null)
-  const [syncNote, setSyncNote] = useState<string | null>(null)
-  const [syncing, setSyncing] = useState(false)
 
   const filters = useMemo(
     () => ({
@@ -334,38 +332,12 @@ export default function RedditSavedView() {
     replaceItem(await response.json())
   }
 
-  async function onSync() {
-    setSyncing(true)
-    setLocalError(null)
-    setSyncNote(null)
-    try {
-      const response = await fetch('/api/reddit-saved/sync', { method: 'POST' })
-      const payload = await response.json().catch(() => ({})) as {
-        error?: string
-        fetched?: number
-        truncated?: boolean
-        username?: string
-      }
-      if (!response.ok) {
-        throw new Error(payload.error ?? `Sync failed (${response.status})`)
-      }
-      const who = payload.username ? ` for u/${payload.username}` : ''
-      const truncated = payload.truncated ? ' Stopped after 5000 items.' : ''
-      setSyncNote(`Synced ${payload.fetched ?? 0} saves${who}.${truncated}`)
-      await reload()
-    } catch (err) {
-      setLocalError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   return (
     <section className="space-y-4">
       <div className="space-y-1">
         <h2 className="text-lg font-medium">Reddit Saved</h2>
         <p className="text-sm text-muted-foreground">
-          Local copies of your Reddit saved posts and comments. Sync reads the API. It does not unsave.
+          Local copies of your Reddit saved posts and comments. The collect script reads your logged-in Saved page and does not unsave.
         </p>
       </div>
 
@@ -379,16 +351,11 @@ export default function RedditSavedView() {
             placeholder="title, author, text…"
           />
         </label>
-        <Button type="button" variant="outline" size="sm" disabled={syncing} onClick={() => void onSync()}>
-          {syncing ? 'Syncing…' : 'Sync'}
-        </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => void reload()}>
           Reload
         </Button>
         <span className="text-xs text-muted-foreground">{total} items</span>
       </div>
-
-      {syncNote ? <p className="text-sm text-muted-foreground">{syncNote}</p> : null}
 
       {localError || listError ? (
         <Alert variant="destructive">
@@ -407,7 +374,7 @@ export default function RedditSavedView() {
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No Reddit saves yet. Run <code className="text-xs">npm run reddit:login</code>, then Sync.
+          No Reddit saves yet. Run <code className="text-xs">npm run reddit:saved-collect -- --limit 5</code>
         </p>
       ) : (
         <VirtualizedList

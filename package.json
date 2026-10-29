@@ -16,7 +16,8 @@
     "db:show": "tsx src/db/show.ts",
     "db:import-notebooks": "tsx scripts/import-notebooks-from-backup.ts",
     "login": "tsx scripts/notebooklm-login.ts",
-    "reddit:login": "tsx scripts/reddit-login.ts",
+    "reddit:saved-login": "tsx scripts/reddit-saved-login.ts",
+    "reddit:saved-collect": "tsx scripts/reddit-saved-collect.ts",
     "postinstall": "npm rebuild better-sqlite3"
   },
   "dependencies": {

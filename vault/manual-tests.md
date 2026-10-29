@@ -26,4 +26,4 @@ Short checks for user-visible behavior that automated tests do not fully cover. 
 
 ## Reddit saved
 
-- [ ] With `REDDIT_CLIENT_ID` set, `npm run reddit:login` prints `Reddit login OK`. Reddit Saved, Sync, lists saved posts. Create notebook on a link post uses the outbound URL. Create notebook on a self post or comment uses the Reddit permalink. Copy text copies the body. A later Sync keeps a local delete and a notebook link.
+- [ ] `npm run reddit:saved-login` opens the login page once and does not reload it. It prints `Reddit saved login OK`. `npm run reddit:saved-collect -- --limit 5` then Reload lists those saves. A 429 stops either script without another request. Create notebook on a link post uses the outbound URL. Create notebook on a self post or comment uses the Reddit permalink. Copy text copies the body. A later collect keeps a local delete and a notebook link.

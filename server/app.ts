@@ -27,9 +27,7 @@ import {
   getRedditSaved,
   patchRedditSaved,
   softDeleteRedditSaved,
-  syncRedditSaved,
 } from '../src/server/reddit-saved-api'
-import { RedditAuthError } from '../src/server/reddit-client'
 import {
   getDbPath,
   listCachedNotebooks,
@@ -328,15 +326,6 @@ export function createApp() {
       return c.json(listRedditSavedPage(parseListPageQuery(new URL(c.req.url).searchParams)))
     } catch (error) {
       return c.json({ error: String(error) }, 500)
-    }
-  })
-
-  app.post('/api/reddit-saved/sync', async (c) => {
-    try {
-      return c.json(await syncRedditSaved())
-    } catch (error) {
-      const status = error instanceof RedditAuthError ? 401 : 500
-      return c.json({ error: error instanceof Error ? error.message : String(error) }, status)
     }
   })
 

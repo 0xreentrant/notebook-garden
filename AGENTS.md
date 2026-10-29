@@ -50,16 +50,21 @@ The person signs in at NotebookLM. Then resume the inspector. The script prints 
 
 Bookmark sync reads the machine Chrome profile: `~/Library/Application Support/Google/Chrome` on macOS, `~/.config/google-chrome` on Linux.
 
-## Reddit login
+## Reddit saved
 
-Saved sync needs a Reddit app (installed, or web if you have a secret) at https://www.reddit.com/prefs/apps. Set the redirect URI to `http://127.0.0.1:8765/callback`. Then:
+Saved posts are read from a logged-in Chrome profile, not the Data API. This login is not required to boot the app. Google Chrome must be installed. The first run opens a window and waits up to five minutes:
 
 ```bash
-export REDDIT_CLIENT_ID=your_client_id
-npm run reddit:login
+npm run reddit:saved-login
 ```
 
-The script prints `Reddit login OK` and stores the refresh token at `~/.config/youtube-ask-summarize/reddit-oauth.json` (override with `REDDIT_TOKEN_PATH`). Also export `REDDIT_CLIENT_SECRET` when the app type is web. Sync from the Reddit Saved tab. `npm run dev` reads those variables from `.env`. This login is not required to boot the app.
+The script prints `Reddit saved login OK` and stores the session under `~/.config/reddit-saved/chrome-profile` (override with `REDDIT_PROFILE_DIR`). Then:
+
+```bash
+npm run reddit:saved-collect -- --limit 5
+```
+
+That writes into `reddit_saved_items`. Reload the Reddit Saved tab. Omit `--limit` to collect every new save. The script does not unsave. Requests are at least 8 seconds apart. A 429 stops login and collect, and neither script retries. `REDDIT_PROFILE_DIR` can live in `.env`.
 
 Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` before `npm ci` only when this login will not be run. Login needs the Playwright browser.
 
