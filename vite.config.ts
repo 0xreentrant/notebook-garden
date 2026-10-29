@@ -23,8 +23,29 @@ export default defineConfig(({ mode }) => {
   if (env.NOTEBOOKLM_COOKIE) process.env.NOTEBOOKLM_COOKIE = env.NOTEBOOKLM_COOKIE
   if (env.NOTEBOOKLM_BASE_URL) process.env.NOTEBOOKLM_BASE_URL = env.NOTEBOOKLM_BASE_URL
 
+  const tailscaleHost = process.env.TAILSCALE_HOST
+  const tailscaleServeHost = process.env.TAILSCALE_SERVE_HOST?.replace(/\.$/, '')
+
   return {
     plugins: [reactRouter(), tailwindcss(), apiPlugin()],
+    server: {
+      port: 5176,
+      allowedHosts: ['.ts.net', ...(tailscaleHost ? [tailscaleHost] : []), ...(tailscaleServeHost ? [tailscaleServeHost] : [])],
+      ...(tailscaleHost && {
+        host: tailscaleHost,
+        hmr: { host: tailscaleHost },
+      }),
+      ...(tailscaleServeHost && {
+        hmr: {
+          protocol: 'wss',
+          host: tailscaleServeHost,
+          clientPort: 443,
+        },
+      }),
+    },
+    preview: {
+      port: 5176,
+    },
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),

@@ -5,6 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true react-router dev",
+    "dev:tailscale": "node scripts/tailscale-dev.mjs",
+    "dev:tailscale:http": "node scripts/tailscale-dev.mjs --http-only",
+    "tailscale:serve": "node scripts/tailscale-serve.mjs",
+    "tailscale:reset": "tailscale serve --service=svc:notebook-garden --https=443 off",
     "build": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true react-router typegen && tsc -b && VITE_CONFIG_NATIVE_IGNORE_WARNING=true react-router build",
     "preview": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true vite preview",
     "typegen": "VITE_CONFIG_NATIVE_IGNORE_WARNING=true react-router typegen",

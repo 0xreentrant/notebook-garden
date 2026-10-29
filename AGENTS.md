@@ -18,7 +18,15 @@ npm run db:migrate
 npm run dev
 ```
 
-`npm run db:migrate` creates `summaries.db` in the repo root when the file is missing and applies `drizzle/`. The dev server prints its URL, usually `http://localhost:5173`. The API is served by that same process.
+`npm run db:migrate` creates `summaries.db` in the repo root when the file is missing and applies `drizzle/`. The dev server prints its URL, usually `http://localhost:5176`. The API is served by that same process.
+
+Phone access on the tailnet uses the same port behind Tailscale HTTPS, same pattern as Qalm:
+
+```bash
+npm run dev:tailscale
+```
+
+That binds Vite to this machine's Tailscale IP on port 5176 and proxies `https://notebook-garden.<tailnet>.ts.net` at it. `npm run tailscale:serve` only updates the proxy. `npm run tailscale:reset` removes it. `npm run dev:tailscale:http` skips HTTPS.
 
 Stop there. The app is running. The YouTube and Library views open with empty data until this machine imports or collects some.
 

@@ -1,5 +1,9 @@
 # Manual tests
 
+## Tailscale
+
+- [ ] `npm run dev:tailscale` prints `https://notebook-garden.<tailnet>.ts.net`. That URL loads the app. `npm run dev` still serves `http://localhost:5176`.
+
 Short checks for user-visible behavior that automated tests do not fully cover. The merge routes are covered in `test/notebook-merge.e2e.test.ts`. These steps are the screens.
 
 ## Merge notebooks
