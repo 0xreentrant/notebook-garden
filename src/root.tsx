@@ -15,7 +15,7 @@ import MetaAnalysisModal from '@/components/MetaAnalysisModal'
 import SettingsMenu from '@/components/SettingsMenu'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { APP_TABS, type AppTabPath } from '@/lib/app-tabs'
-import { writeObsidianVault } from '@/lib/settings'
+import { htmlThemeClass, themeBootScript, writeObsidianVault } from '@/lib/settings'
 import { cn } from '@/lib/utils'
 
 function YouTubeIcon({ className }: { className?: string }) {
@@ -36,9 +36,10 @@ const TAB_ICONS: Record<AppTabPath, LucideIcon | typeof YouTubeIcon> = {
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className={htmlThemeClass()} suppressHydrationWarning>
       <head>
         <meta charSet="UTF-8" />
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript() }} />
         <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>notebook-garden</title>

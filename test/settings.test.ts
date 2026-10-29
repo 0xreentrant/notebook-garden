@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  htmlThemeClass,
   readObsidianVault,
   readTheme,
+  themeBootScript,
   withWorkspaceSwitch,
   workspaceSwitchDirective,
   writeObsidianVault,
@@ -45,6 +47,18 @@ describe('settings', () => {
     expect(toggle).toHaveBeenCalledWith('dark', true)
     writeTheme('light')
     expect(toggle).toHaveBeenCalledWith('dark', false)
+  })
+
+  it('boot script toggles .dark the same way readTheme does', () => {
+    expect(htmlThemeClass()).toBeUndefined()
+    const boot = new Function(themeBootScript()) as () => void
+    boot()
+    expect(toggle).toHaveBeenCalledWith('dark', false)
+
+    store.set('notebook-garden:theme', 'dark')
+    expect(htmlThemeClass()).toBe('dark')
+    boot()
+    expect(toggle).toHaveBeenCalledWith('dark', true)
   })
 
   it('prepends workspace switch only when vault is set', () => {

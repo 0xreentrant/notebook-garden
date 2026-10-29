@@ -17,6 +17,15 @@ export function applyTheme(theme: Theme) {
   document.documentElement.classList.toggle('dark', theme === 'dark')
 }
 
+export function htmlThemeClass(): 'dark' | undefined {
+  if (typeof document === 'undefined') return undefined
+  return readTheme() === 'dark' ? 'dark' : undefined
+}
+
+export function themeBootScript(): string {
+  return `(function(){try{document.documentElement.classList.toggle('dark',localStorage.getItem(${JSON.stringify(THEME_KEY)})==='dark')}catch(e){}})()`
+}
+
 export function readObsidianVault(): string {
   return localStorage.getItem(VAULT_KEY)?.trim() ?? ''
 }
