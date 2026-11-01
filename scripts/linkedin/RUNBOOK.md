@@ -5,7 +5,7 @@ Worktree/branch: `feature/linkedin-saved` (repo root may be `notebook-garden-lin
 ## Auth
 
 ```bash
-python3 scripts/linkedin/li-login.py
+npm run linkedin:saved-login
 ```
 
 Profile: `~/.config/linkedin-saved/chrome-profile` (mode `0700`).
@@ -15,13 +15,13 @@ Manual login only. Hard-stop on checkpoint / captcha / restricted account.
 
 ```bash
 # sample
-python3 scripts/linkedin/li-collect.py --limit 5
+npm run linkedin:saved-collect -- --limit 5
 
 # dry run
-python3 scripts/linkedin/li-collect.py --dry-run --limit 3
+npm run linkedin:saved-collect -- --dry-run --limit 3
 
 # all new URNs
-python3 scripts/linkedin/li-collect.py
+npm run linkedin:saved-collect
 ```
 
 Writes to `summaries.db` table `linkedin_saved_items`.
@@ -54,7 +54,7 @@ sqlite3 summaries.db "SELECT id, item_type, substr(title,1,60), length(content_t
 ## Self-check
 
 ```bash
-python3 scripts/linkedin/check-posts-db.py
+npm run test:run -- test/linkedin-collect.test.ts
 ```
 
 ## Unsave

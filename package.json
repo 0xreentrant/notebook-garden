@@ -22,6 +22,8 @@
     "login": "tsx scripts/notebooklm-login.ts",
     "reddit:saved-login": "tsx scripts/reddit-saved-login.ts",
     "reddit:saved-collect": "tsx scripts/reddit-saved-collect.ts",
+    "linkedin:saved-login": "tsx scripts/linkedin-saved-login.ts",
+    "linkedin:saved-collect": "tsx scripts/linkedin-saved-collect.ts",
     "postinstall": "npm rebuild better-sqlite3"
   },
   "dependencies": {

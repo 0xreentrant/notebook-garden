@@ -28,6 +28,10 @@ Short checks for user-visible behavior that automated tests do not fully cover. 
 
 - [ ] YouTube: check a few videos. Open Bookmarks and check a bookmark. Open Notebooks and check a notebook. Return to YouTube: the same videos are still checked. Bookmarks: that bookmark is still checked. Notebooks: that notebook is still checked. Each tab keeps its own selection.
 
+## LinkedIn saved
+
+- [ ] `npm run linkedin:saved-login` prints `LinkedIn saved login OK`. `npm run linkedin:saved-collect -- --limit 5` then Reload lists those saves. The collector does not unsave. A logged-out or checkpoint page stops the run.
+
 ## Reddit saved
 
 - [ ] `npm run reddit:saved-login` opens the login page once and does not reload it. It prints `Reddit saved login OK`. `npm run reddit:saved-collect -- --limit 5` then Reload lists those saves. A 429 stops either script without another request. Create notebook on a link post uses the outbound URL. Create notebook on a self post or comment uses the Reddit permalink. Copy text copies the body. A later collect keeps a local delete and a notebook link.

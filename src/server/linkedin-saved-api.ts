@@ -337,3 +337,119 @@ export function softDeleteLinkedInSaved(id: number) {
     db.close()
   }
 }
+
+export type LinkedInCapture = {
+  linkedin_urn: string
+  item_type: string
+  linkedin_url: string
+  source_url?: string | null
+  author_name?: string | null
+  author_url?: string | null
+  author_headline?: string | null
+  title?: string | null
+  content_text?: string | null
+  raw_metadata?: Record<string, unknown> | string | null
+  content_hash?: string | null
+  extracted_at?: string | null
+  capture_status: string
+  capture_error?: string | null
+}
+
+export function existingLinkedInUrns() {
+  const db = openDb(true)
+  try {
+    const rows = db
+      .prepare(`SELECT linkedin_urn FROM linkedin_saved_items WHERE deleted_at IS NULL`)
+      .all() as { linkedin_urn: string }[]
+    return new Set(rows.map((row) => row.linkedin_urn))
+  } finally {
+    db.close()
+  }
+}
+
+export function upsertLinkedInCapture(item: LinkedInCapture, refresh = false) {
+  const db = openDb()
+  try {
+    const now = new Date().toISOString()
+    const existing = db
+      .prepare(
+        `SELECT id, content_hash, capture_status FROM linkedin_saved_items WHERE linkedin_urn = ?`,
+      )
+      .get(item.linkedin_urn) as
+      | { id: number; content_hash: string | null; capture_status: string }
+      | undefined
+    const raw = item.raw_metadata
+    const rawMetadata = typeof raw === 'string' ? raw : JSON.stringify(raw ?? {})
+    const payload = {
+      linkedin_urn: item.linkedin_urn,
+      item_type: item.item_type,
+      linkedin_url: item.linkedin_url,
+      source_url: item.source_url ?? null,
+      author_name: item.author_name ?? null,
+      author_url: item.author_url ?? null,
+      author_headline: item.author_headline ?? null,
+      title: item.title ?? null,
+      content_text: item.content_text ?? null,
+      raw_metadata: rawMetadata || '{}',
+      content_hash: item.content_hash ?? null,
+      extracted_at: item.extracted_at || now,
+      capture_status: item.capture_status,
+      capture_error: item.capture_error ?? null,
+      updated_at: now,
+    }
+
+    if (!existing) {
+      db.prepare(
+        `
+        INSERT INTO linkedin_saved_items (
+          linkedin_urn, item_type, linkedin_url, source_url,
+          author_name, author_url, author_headline, title, content_text,
+          raw_metadata, content_hash, extracted_at,
+          capture_status, capture_error, enrichment_status,
+          notebooklm_links, tags, created_at, updated_at
+        ) VALUES (
+          @linkedin_urn, @item_type, @linkedin_url, @source_url,
+          @author_name, @author_url, @author_headline, @title, @content_text,
+          @raw_metadata, @content_hash, @extracted_at,
+          @capture_status, @capture_error, 'pending',
+          '[]', '[]', @updated_at, @updated_at
+        )
+      `,
+      ).run(payload)
+      return 'inserted' as const
+    }
+
+    if (!refresh && (existing.capture_status === 'complete' || existing.capture_status === 'metadata_only')) {
+      return 'skipped' as const
+    }
+
+    const resetEnrichment = Boolean(payload.content_hash && payload.content_hash !== existing.content_hash)
+    const resetSql = resetEnrichment
+      ? `, enrichment_status = 'pending', enrichment_error = NULL, summary_text = NULL, enriched_at = NULL`
+      : ''
+    db.prepare(
+      `
+      UPDATE linkedin_saved_items SET
+        item_type = @item_type,
+        linkedin_url = @linkedin_url,
+        source_url = @source_url,
+        author_name = @author_name,
+        author_url = @author_url,
+        author_headline = @author_headline,
+        title = @title,
+        content_text = @content_text,
+        raw_metadata = @raw_metadata,
+        content_hash = @content_hash,
+        extracted_at = @extracted_at,
+        capture_status = @capture_status,
+        capture_error = @capture_error,
+        updated_at = @updated_at
+        ${resetSql}
+      WHERE linkedin_urn = @linkedin_urn
+    `,
+    ).run(payload)
+    return 'updated' as const
+  } finally {
+    db.close()
+  }
+}

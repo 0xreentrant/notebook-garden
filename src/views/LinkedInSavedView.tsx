@@ -376,7 +376,7 @@ export default function LinkedInSavedView() {
       ) : items.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No LinkedIn items yet. Run{' '}
-          <code className="text-xs">python3 scripts/linkedin/li-collect.py --limit 5</code>
+          <code className="text-xs">npm run linkedin:saved-collect -- --limit 5</code>
         </p>
       ) : (
         <VirtualizedList

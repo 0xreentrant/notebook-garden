@@ -76,8 +76,26 @@ That writes into `reddit_saved_items`. Reload the Reddit Saved tab. Omit `--limi
 
 Set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` before `npm ci` only when this login will not be run. Login needs the Playwright browser.
 
+## LinkedIn saved
+
+Saved posts are read from a logged-in Chrome profile. This login is not required to boot the app. Google Chrome must be installed. The first run opens a window and waits up to five minutes:
+
+```bash
+npm run linkedin:saved-login
+```
+
+The script prints `LinkedIn saved login OK` and stores the session under `~/.config/linkedin-saved/chrome-profile` (override with `LI_PROFILE_DIR`). Then:
+
+```bash
+npm run linkedin:saved-collect -- --limit 5
+```
+
+That writes into `linkedin_saved_items`. Reload the LinkedIn Saved tab. Omit `--limit` to collect every new save. The script does not unsave. A login wall, checkpoint, or restricted account stops the run.
+
+Summaries still run from Python: `python3 scripts/linkedin/generate-linkedin-summaries.py`.
+
 ## Not part of app setup
 
 - `scripts/backup-db.sh` publishes the owner's database to a private GitHub repo. Do not run it for someone else's checkout.
 - YouTube Watch Later ingestion lives outside this repo, in `~/.cursor/skills/youtube-ask-summarize/scripts/`.
-- LinkedIn collectors under `scripts/linkedin/` need Python Playwright and a logged-in Chrome profile. They are not required to boot the app.
+- LinkedIn summary generation and the recon spikes under `scripts/linkedin/` still use Python. They are not required to boot the app.
